@@ -1,8 +1,9 @@
-import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Edit2, Package, Tag, ChartBar, LayoutGrid, Beaker } from 'lucide-react-native';
-import { DUMMY_PRODUITS } from './dummyData';
+import { initDB } from '@/lib/db/schema';
+import { Colors as ThemeColors } from '@/constants/colors';
+import React from 'react';
 
 const colors = {
   background: '#FAFAFA',
@@ -21,8 +22,38 @@ const colors = {
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const [produit, setProduit] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const produit = DUMMY_PRODUITS.find(p => p.id === id);
+  React.useEffect(() => {
+    const fetchProduit = async () => {
+      try {
+        const db = await initDB();
+        // Since useLocalSearchParams can return string | string[], we ensure it's a string
+        const productId = Array.isArray(id) ? id[0] : id;
+        
+        const data = await db.getFirstAsync<any>(
+          "SELECT * FROM produits WHERE id = ?",
+          [productId]
+        );
+        setProduit(data);
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchProduit();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.center}><Text>Chargement...</Text></View>
+      </SafeAreaView>
+    );
+  }
 
   if (!produit) {
     return (
@@ -39,7 +70,7 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const isAlert = produit.stockActuel <= produit.stockMin;
+  const isAlert = produit.stock_actuel <= produit.stock_min;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -68,7 +99,7 @@ export default function ProductDetailScreen() {
             </View>
             <View style={[styles.stockBadge, isAlert ? styles.stockBadgeAlert : styles.stockBadgeOk]}>
               <Text style={[styles.stockBadgeText, isAlert ? styles.stockBadgeTextAlert : styles.stockBadgeTextOk]}>
-                {produit.stockActuel} en stock
+                {produit.stock_actuel} en stock
               </Text>
             </View>
           </View>
@@ -78,22 +109,22 @@ export default function ProductDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tarification & Vente</Text>
           
-          {produit.typeVente === 'piece' || produit.typeVente === 'les_deux' ? (
+          {produit.type_vente === 'piece' || produit.type_vente === 'les_deux' ? (
             <View style={styles.infoRow}>
               <View style={styles.infoIconBox}><Tag size={18} color="#3B82F6" /></View>
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Prix à l'unité</Text>
-                <Text style={styles.infoValue}>{produit.prixPiece?.toLocaleString('fr-FR')} FCFA</Text>
+                <Text style={styles.infoValue}>{produit.prix_unitaire?.toLocaleString('fr-FR')} FCFA</Text>
               </View>
             </View>
           ) : null}
 
-          {produit.typeVente === 'carton' || produit.typeVente === 'les_deux' ? (
+          {produit.type_vente === 'carton' || produit.type_vente === 'les_deux' ? (
             <View style={styles.infoRow}>
               <View style={styles.infoIconBox}><LayoutGrid size={18} color="#8B5CF6" /></View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Prix par gros (Carton de {produit.unitesParCarton})</Text>
-                <Text style={styles.infoValue}>{produit.prixCarton?.toLocaleString('fr-FR')} FCFA</Text>
+                <Text style={styles.infoLabel}>Prix par gros (Carton de {produit.unites_par_carton})</Text>
+                <Text style={styles.infoValue}>{produit.prix_carton?.toLocaleString('fr-FR')} FCFA</Text>
               </View>
             </View>
           ) : null}
@@ -105,11 +136,11 @@ export default function ProductDetailScreen() {
           <View style={styles.statsGrid}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Stock Actuel</Text>
-              <Text style={[styles.statValue, isAlert && { color: colors.danger }]}>{produit.stockActuel}</Text>
+              <Text style={[styles.statValue, isAlert && { color: colors.danger }]}>{produit.stock_actuel}</Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Seuil d'Alerte</Text>
-              <Text style={styles.statValue}>{produit.stockMin}</Text>
+              <Text style={styles.statValue}>{produit.stock_min}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/(drawer)/screens/inventaire/mouvements')}>

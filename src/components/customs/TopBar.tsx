@@ -2,7 +2,9 @@
 // LOTUS BUSINESS — Composant : TopBar
 // ============================================
 
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import { Image } from "expo-image";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 interface TopBarProps {
   showLogo?: boolean;
@@ -10,15 +12,16 @@ interface TopBarProps {
 
 export default function TopBar({ showLogo = true }: TopBarProps) {
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(400)} style={styles.container}>
       {showLogo && (
         <Image
           source={require("../../../assets/images/logo-black.png")}
-          style={{ width: 30, height: 30 }}
+          style={{ width: 32, height: 32 }}
+          contentFit="contain"
         />
       )}
       <Text style={styles.appName}>Lotus</Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -26,12 +29,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
   appName: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "900",
     color: "#0A0A0A",
     letterSpacing: 1.5,

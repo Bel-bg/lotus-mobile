@@ -1,9 +1,9 @@
 // ============================================
-// ——————————— Splash Screen ———————————
+// **************  Splash Screen **************
 // ============================================
 
 import { useRouter } from "expo-router";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Dimensions, StatusBar, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -17,6 +17,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { NAVIGATION_CONFIG } from "../../store/config";
 import { useAuthStore } from "../../store/useAuthStore";
+import { FontFamily } from "@/constants";
+import { initDB, getBoutique, isBoutiqueConfigured } from "../../lib/db";
 
 const { width } = Dimensions.get("window");
 
@@ -32,26 +34,68 @@ export default function SplashScreen() {
   const taglineOpacity = useSharedValue(0);
   const progressWidth = useSharedValue(0);
 
-  const { isAuthenticated, isOnboardingComplete, licenceStatut } = useAuthStore();
+  // Résultat de la vérification DB (null = en cours)
+  const dbCheckResult = useRef<boolean | null>(null);
+
+  const { isAuthenticated, setOnboardingComplete, setBoutique } = useAuthStore();
+
+  /**
+   * Vérifie la DB pendant l'animation.
+   * - Initialise SQLite si ce n'est pas déjà fait
+   * - Interroge réellement la table boutique
+   * - Resynchronise le store si nécessaire
+   */
+  const checkDatabase = useCallback(async () => {
+    try {
+      await initDB();
+
+      if (!isAuthenticated) {
+        dbCheckResult.current = false;
+        return;
+      }
+
+      const configured = await isBoutiqueConfigured();
+
+      if (configured) {
+        // Resynchroniser le store avec les données réelles de la DB
+        const boutique = await getBoutique();
+        if (boutique) setBoutique(boutique);
+        setOnboardingComplete(true);
+      } else {
+        setOnboardingComplete(false);
+      }
+
+      dbCheckResult.current = configured;
+    } catch (error) {
+      console.warn('[SplashScreen] Erreur vérification DB :', error);
+      // En cas d'erreur DB, on se base sur le store persisté
+      dbCheckResult.current = null;
+    }
+  }, [isAuthenticated, setBoutique, setOnboardingComplete]);
 
   const handleInitialNavigation = useCallback(() => {
-    if (!isOnboardingComplete) {
-      router.replace("/(auth)/onboarding/slide1");
-      return;
-    }
     if (!isAuthenticated) {
       router.replace("/(auth)/google-signin");
       return;
     }
-    if (licenceStatut === "actif") {
-      router.replace("/(drawer)/(tabs)");
-    } else {
-      router.replace("/(auth)/VerifyingScreen");
+
+    // Priorité : résultat DB (source de vérité), sinon store persisté
+    const isReady = dbCheckResult.current ?? false;
+
+    if (!isReady) {
+      router.replace("/(auth)/google-signin");
+      return;
     }
-  }, [isAuthenticated, isOnboardingComplete, licenceStatut, router]);
+
+    // Connecté + boutique configurée en DB → accueil direct
+    router.replace("/(drawer)/(tabs)");
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
     StatusBar.setBarStyle("dark-content");
+
+    // Lancer la vérification DB en parallèle de l'animation
+    checkDatabase();
 
     // Phase 1: Logo Entrance (Scale + Fade + Bounce)
     logoScale.value = withTiming(1, {
@@ -93,7 +137,7 @@ export default function SplashScreen() {
       easing: Easing.linear,
     });
 
-    // Final Action: Navigation
+    // Final Action: Navigation (après la durée du splash)
     const timer = setTimeout(() => {
       runOnJS(handleInitialNavigation)();
     }, NAVIGATION_CONFIG.splashDureeMs);
@@ -134,7 +178,6 @@ export default function SplashScreen() {
           style={[styles.logo, animatedLogoStyle]}
           resizeMode="contain"
         />
-
         <Animated.Text style={[styles.appName, animatedTextStyle]}>
           Lotus Business
         </Animated.Text>
@@ -143,7 +186,6 @@ export default function SplashScreen() {
           Gérez votre boutique, simplement.
         </Animated.Text>
       </View>
-
       {/* Elegant Progress Bar */}
       <View style={styles.progressContainer}>
         <Animated.View style={[styles.progressBar, animatedProgressStyle]} />
@@ -173,14 +215,14 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 32,
-    fontWeight: "700",
+    fontFamily: FontFamily.display,
     color: "#0A0A0A",
   },
   tagline: {
     fontSize: 14,
-    color: "#6B6B6B",
+    fontFamily: FontFamily.content,
+    color: "#0A0A0A",
     marginTop: 8,
-    fontWeight: "400",
   },
   progressContainer: {
     position: "absolute",

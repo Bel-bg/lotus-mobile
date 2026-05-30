@@ -1,9 +1,9 @@
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useRouter } from "expo-router";
-import { BarChart3, Box, Cloudy, Home, Plus } from "lucide-react-native";
 import React from "react";
 import {
   Dimensions,
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -13,7 +13,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
-const VISIBLE_TABS = ["index", "stock/index", "bilan/index", "sauvegarde"] as const;
+const VISIBLE_TABS = ["index", "stock/index", "bilan/index", "move/index"] as const;
+
+const imageIcons = {
+  home: require("@/assets/icons/home.png"),
+  stock: require("@/assets/icons/stock.png"),
+  bilan: require("@/assets/icons/bilan.png"),
+  move: require("@/assets/icons/move.png"),
+  add: require("@/assets/icons/add.png"),
+};
 
 export default function TabsBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -59,11 +67,10 @@ export default function TabsBar({ state, descriptors, navigation }: BottomTabBar
                 style={[styles.tabItem, isFocused && styles.tabItemActive]}
                 activeOpacity={0.7}
               >
-                {route.name === "index" ? (
-                  <Home size={22} color={isFocused ? "#000" : "#999"} strokeWidth={2} />
-                ) : (
-                  <Box size={22} color={isFocused ? "#000" : "#999"} strokeWidth={2} />
-                )}
+                <Image
+                  source={route.name === "index" ? imageIcons.home : imageIcons.stock}
+                  style={[styles.tabIcon, { tintColor: isFocused ? "#000" : "#999" }]}
+                />
                 <Text style={[styles.tabLabel, { color: isFocused ? "#000" : "#999" }]}>
                   {route.name === "index" ? "HOME" : "STOCK"}
                 </Text>
@@ -72,10 +79,8 @@ export default function TabsBar({ state, descriptors, navigation }: BottomTabBar
           })}
         </View>
 
-        {/* Center Button Placeholder Spacing */}
         <View style={styles.centerSpace} />
 
-        {/* Right Tabs */}
         <View style={styles.tabGroup}>
           {visibleRoutes.slice(2, 4).map((route) => {
             const routeIndex = state.routes.findIndex(
@@ -102,13 +107,12 @@ export default function TabsBar({ state, descriptors, navigation }: BottomTabBar
                 style={[styles.tabItem, isFocused && styles.tabItemActive]}
                 activeOpacity={0.7}
               >
-                {route.name === "bilan/index" ? (
-                  <BarChart3 size={22} color={isFocused ? "#000" : "#999"} strokeWidth={2} />
-                ) : (
-                  <Cloudy size={22} color={isFocused ? "#000" : "#999"} strokeWidth={2} />
-                )}
+                <Image
+                  source={route.name === "bilan/index" ? imageIcons.bilan : imageIcons.move}
+                  style={[styles.tabIcon, { tintColor: isFocused ? "#000" : "#999" }]}
+                />
                 <Text style={[styles.tabLabel, { color: isFocused ? "#000" : "#999" }]}>
-                  {route.name === "bilan/index" ? "BILAN" : "Sauvegardes"}
+                  {route.name === "bilan/index" ? "BILAN" : "MOUV."}
                 </Text>
               </TouchableOpacity>
             );
@@ -122,7 +126,7 @@ export default function TabsBar({ state, descriptors, navigation }: BottomTabBar
         activeOpacity={0.8}
         onPress={() => router.push("/(drawer)/(tabs)/ventes/nouvelle")}
       >
-        <Plus size={30} color="#FFF" strokeWidth={2.5} />
+        <Image source={imageIcons.add} style={styles.addIcon} />
       </TouchableOpacity>
     </View>
   );
@@ -136,26 +140,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    paddingTop: 12,
-    borderTopWidth: 1,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
     borderTopColor: "rgba(0,0,0,0.05)",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
   },
   content: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
   },
   tabGroup: {
     flexDirection: "row",
@@ -186,23 +178,23 @@ const styles = StyleSheet.create({
   centerButton: {
     position: "absolute",
     left: width / 2 - 30,
-    top: -25,
+    top: -20,
     width: 60,
     height: 60,
     backgroundColor: "#000",
-    borderRadius: 18,
+    borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
+  },
+  tabIcon: {
+    width: 22,
+    height: 22,
+    resizeMode: "contain",
+  },
+  addIcon: {
+    width: 30,
+    height: 30,
+    tintColor: "#FFF",
+    resizeMode: "contain",
   },
 });

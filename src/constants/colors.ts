@@ -7,6 +7,7 @@ export const Colors = {
   background: 'rgba(255, 255, 255, 1)',
   surface: '#F5F5F5',
   surfaceAlt: '#EFEFEF',
+  black: '#000000',
 
   // --- Borders ---
   border: '#E0E0E0',

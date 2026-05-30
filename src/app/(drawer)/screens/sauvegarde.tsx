@@ -3,7 +3,7 @@ import { Colors } from "@/constants/colors";
 import { FontFamily } from "@/constants/typography";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import DocumentsScreen from "./sauvegarde/documents";
+import DocumentsScreen from "../screens/sauvegarde/documents";
 
 export default function SauvegardeScreen() {
   return (

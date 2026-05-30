@@ -7,6 +7,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  ImageBackground,
   StatusBar,
   StyleSheet,
   Text,
@@ -14,72 +15,74 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import LinkButton from "../../components/LinkButton";
-import TopBar from "../../components/customs/TopBar";
-import { useAuthStore } from "../../store/useAuthStore";
+import BackgroundImage from "@/assets/background.png";
+import { FontFamily } from "../../constants/typography";
 
 export default function GoogleSignInScreen() {
   const router = useRouter();
-  // const { setUser } = useAuthStore()
-
-  const handleSkip = () => {
-    router.replace("/(drawer)/(tabs)");
-  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <ImageBackground
+      source={BackgroundImage}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="transparent"
+          translucent
+        />
+        <View style={{justifyContent:"center",alignItems:"center",marginVertical:12}}>
 
-      <TopBar />
-
-      <View style={styles.container}>
-        {/* Zone centrale */}
-        <View style={styles.centerBlock}>
-          <Text style={styles.title}>Connectez-vous{"\n"}avec Google</Text>
-          <Text style={styles.subtitle}>
-            Sauvegardez automatiquement votre inventaire et vos ventes sur votre
-            Google Drive pour ne jamais perdre vos données.
-          </Text>
+        <Text style={{ fontFamily: FontFamily.display, fontSize: 28, letterSpacing: 1.5, lineHeight: 36 }}>Lotus Business</Text>
         </View>
 
-        {/* Boutons */}
-        <View style={styles.actionsBlock}>
-          {/* Bouton Google */}
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={handleSkip}
-            activeOpacity={0.85}
-          >
-            <Image
-              source={require("../../../assets/images/google.png")}
-              style={styles.googleLogo}
-              resizeMode="contain"
-            />
-            <Text style={styles.googleButtonText}>Continuer avec Google</Text>
-          </TouchableOpacity>
+        <View style={styles.container}>
+          {/* Zone centrale */}
+          <View style={styles.centerBlock}>
+            <Text style={styles.title}>Votre boutique,{"\n"}sous contrôle.</Text>
+            <Text style={styles.subtitle}>
+              Stocks, ventes, factures et bilans gérés{"\n"}
+              depuis votre téléphone. Simple,{"\n"}
+              rapide et automatique.
+            </Text>
+          </View>
 
-          {/* Ignorer */}
-          <LinkButton
-            highlight="Ignorer pour l'instant "
-            onPress={handleSkip}
-          />
-
-          {/* Notice légale */}
-          <Text style={styles.legal}>
-            En continuant, vous autorisez Lotus Business à synchroniser vos
-            données avec votre compte Google.{"\n"}
-            Vos données sont chiffrées et sécurisées.
-          </Text>
+          {/* Boutons */}
+          <View style={styles.actionsBlock}>
+            {/* Bouton Google */}
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={() => router.push("/(auth)/VerifyingScreen")}
+              activeOpacity={0.85}
+            >
+              <Image
+                source={require("../../../assets/images/google.png")}
+                style={styles.googleLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.googleButtonText}>Continuer avec Google</Text>
+            </TouchableOpacity>
+            {/* Notice légale */}
+            <Text style={styles.legal}>
+              En continuant, vous acceptée les règles et politiques de confidentialité de Lotus Business. {"\n"}
+              <Text style={{textDecorationLine: "underline",}}>Lire les termes et conditions</Text>
+            </Text>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   container: {
     flex: 1,
@@ -95,7 +98,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "700",
+    fontFamily: FontFamily.displaySemi,
     color: "#0A0A0A",
     letterSpacing: -0.5,
     lineHeight: 36,
@@ -103,6 +106,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
+    fontFamily: FontFamily.content,
     color: "#6B6B6B",
     lineHeight: 22,
     fontWeight: "400",
@@ -122,6 +126,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 13,
+    fontFamily: FontFamily.content,
     color: "#DC2626",
     textAlign: "center",
     fontWeight: "500",
@@ -148,11 +153,12 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontFamily: FontFamily.utilityBold,
     color: "#0A0A0A",
   },
   legal: {
     fontSize: 12,
+    fontFamily: FontFamily.content,
     color: "#9E9E9E",
     textAlign: "center",
     lineHeight: 18,

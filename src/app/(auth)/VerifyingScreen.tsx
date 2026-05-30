@@ -1,11 +1,8 @@
-// ============================================
-// LOTUS BUSINESS — Écran : Vérification licence
-// ============================================
-
-import LoadingGif from "@/assets/images/loading.gif";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { Image, StatusBar, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { StatusBar, StyleSheet, Text, View, ImageBackground, TouchableOpacity } from "react-native";
+import CustomAlert from "../../components/customs/Alert";
 import {
   Easing,
   useAnimatedStyle,
@@ -14,11 +11,14 @@ import {
   withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import TopBar from "../../components/customs/TopBar";
 import ProgressBar from "../../components/ProgressBar";
 import StepItem, { StepStatus } from "../../components/StepItem";
 import { Colors } from "../../constants/colors";
-import { TextStyles } from "../../constants/typography";
+import { AUTH_WHITELIST, GOOGLE_AUTH_CONFIG } from "../../constants/auth";
+import { FontFamily, TextStyles } from "../../constants/typography";
+import { useAuthStore } from "../../store/useAuthStore";
+import BackgroundImage from "@/assets/background.png";
+import {ChevronsRight} from "lucide-react-native"
 
 type Steps = {
   google: StepStatus;
@@ -28,6 +28,9 @@ type Steps = {
 
 export default function VerifyingScreen() {
   const router = useRouter();
+  const hasRun = useRef(false);
+  const setUser = useAuthStore((s) => s.setUser);
+
   const [steps, setSteps] = useState<Steps>({
     google: "loading",
     licence: "pending",
@@ -38,18 +41,70 @@ export default function VerifyingScreen() {
     "Établissement d'une connexion sécurisée...",
   );
 
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertData, setAlertData] = useState<{
+    title: string;
+    description: string;
+    iconName: any;
+    color: string;
+    primaryButtonLabel?: string;
+    onPrimaryPress: () => void;
+    secondaryButtonLabel?: string;
+    onSecondaryPress?: () => void;
+  }>({
+    title: "",
+    description: "",
+    iconName: "AlertTriangle" as any,
+    color: Colors.danger,
+    primaryButtonLabel: "Compris",
+    onPrimaryPress: () => setAlertVisible(false),
+  });
+
+  const showAlert = (
+    title: string,
+    description: string,
+    iconName: any = "AlertTriangle",
+    color: string = Colors.danger,
+    onPress?: () => void,
+    primaryButtonLabel = "Compris",
+    secondaryButtonLabel?: string,
+    onSecondaryPress?: () => void
+  ) => {
+    setAlertData({
+      title,
+      description,
+      iconName,
+      color,
+      primaryButtonLabel,
+      secondaryButtonLabel,
+      onSecondaryPress,
+      onPrimaryPress: () => {
+        setAlertVisible(false);
+        if (onPress) onPress();
+      },
+    });
+    setAlertVisible(true);
+  };
+
   const rotation = useSharedValue(0);
 
+  // Un seul useEffect, avec le guard hasRun
   useEffect(() => {
     rotation.value = withRepeat(
-      withTiming(360, {
-        duration: 1000,
-        easing: Easing.linear,
-      }),
+      withTiming(360, { duration: 1000, easing: Easing.linear }),
       -1,
       false,
     );
-    runVerification();
+
+    GoogleSignin.configure({
+      webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+      offlineAccess: false,
+    });
+
+    if (!hasRun.current) {
+      hasRun.current = true;
+      runVerification();
+    }
   }, []);
 
   const animatedSpinnerStyle = useAnimatedStyle(() => ({
@@ -57,55 +112,127 @@ export default function VerifyingScreen() {
   }));
 
   async function runVerification() {
-    // Étape 1 — Connexion Google
-    setSteps({ google: "loading", licence: "pending", data: "pending" });
-    setProgress(10);
-    await delay(5000);
+    try {
+      setSteps({ google: "loading", licence: "pending", data: "pending" });
+      setProgress(10);
+      setFooterText("Connexion à votre compte Google...");
 
-    setSteps({ google: "done", licence: "loading", data: "pending" });
-    setProgress(40);
-    setFooterText("Vérification de votre licence...");
-    await delay(5000);
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
 
-    // TODO: Appel réel Firebase ici
-    // const result = await verifierLicence(email)
+      const googleUser = userInfo.data?.user;
+      const email = googleUser?.email ?? "";
 
-    setSteps({ google: "done", licence: "done", data: "loading" });
-    setProgress(75);
-    setFooterText("Chargement de vos données...");
-    await delay(2000);
+      if (!email) {
+        setSteps({ google: "error", licence: "pending", data: "pending" });
+        setFooterText("Impossible de récupérer l'email Google.");
+        showAlert(
+          "Erreur de connexion",
+          "Impossible de récupérer l'adresse email de votre compte Google.",
+          "XCircle",
+          Colors.danger,
+          () => router.back(),
+        );
+        return;
+      }
 
-    setSteps({ google: "done", licence: "done", data: "done" });
-    setProgress(100);
-    await delay(500);
+      const isAuthorized = AUTH_WHITELIST.includes(email);
 
-    router.replace("/(auth)/ConfigReadyScreen");
+      if (!isAuthorized) {
+        await GoogleSignin.signOut();
+        router.replace("/(auth)/RejectScreen");
+        return;
+      }
+
+      // ✅ Étape 1 validée — alimentation du store avec les données Google
+      setUser({
+        uid: googleUser?.id ?? email,
+        email,
+        displayName: googleUser?.name ?? email.split('@')[0],
+        photoURL: googleUser?.photo ?? null,
+      });
+
+      // Email autorisé → validation séquentielle visuelle
+      setSteps({ google: "done", licence: "pending", data: "pending" });
+      setProgress(33);
+      setFooterText("Connexion Google réussie...");
+      await delay(600);
+
+      setSteps({ google: "done", licence: "done", data: "pending" });
+      setProgress(66);
+      setFooterText("Licence acceptée...");
+      await delay(600);
+
+      setSteps({ google: "done", licence: "done", data: "done" });
+      setProgress(100);
+      setFooterText("Données chargées avec succès !");
+      await delay(500);
+
+      router.push("/(auth)/formSheet");
+    } catch (err: any) {
+      if (err.code === "SIGN_IN_CANCELLED") {
+        setSteps({ google: "error", licence: "pending", data: "pending" });
+        setFooterText("Connexion Google annulée.");
+        showAlert(
+          "Connexion annulée",
+          "Vous avez annulé la connexion Google.",
+          "XCircle",
+          Colors.danger,
+          () => router.back(),
+        );
+        return;
+      }
+
+      console.error("Erreur Google Sign-In:", err);
+      setSteps({ google: "error", licence: "error", data: "error" });
+      setFooterText(`Erreur : ${err?.code || "Inconnue"} - ${err?.message || err}`);
+      showAlert(
+        "Échec de la connexion",
+        `Code d'erreur : ${err?.code}\nMessage : ${err?.message}\n\nSi le code est 10 (DEVELOPER_ERROR), vérifiez que le SHA-1 correspond bien à celui du projet.`,
+        "XCircle",
+        Colors.danger,
+      );
+    }
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <ImageBackground
+          source={BackgroundImage}
+          style={styles.backgroundImage}
+          resizeMode="cover">
 
-      <TopBar />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      
+      <View style={styles.header}>
+        <View style={{justifyContent:"center",alignItems:"center",marginVertical:12}}>
+        
+        <Text style={{ fontFamily: FontFamily.display, fontSize: 28, letterSpacing: 1.5, lineHeight: 36 }}>Lotus Business</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={() => {
+            showAlert(
+              "Attention",
+              "Certaines fonctionnalités risquent de ne pas fonctionner sans authentification.",
+              "AlertTriangle",
+              Colors.warning,
+              () => router.push("/(auth)/formSheet"),
+              "Continuer",
+              "Annuler",
+              () => setAlertVisible(false)
+            );
+          }}
+        >
+          <View style={{flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center",}}>
+            <Text style={styles.skipText}>Passer</Text>
+           <ChevronsRight color={Colors.textPrimary} size={20} strokeWidth={2.5} />
+          </View>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.container}>
-        {/* Zone centrale */}
         <View style={styles.centerBlock}>
-          {/* Spinner principal */}
-          <View style={styles.spinnerContainer}>
-            <Image
-              source={LoadingGif}
-              style={styles.spinnerInner}
-              resizeMode="contain"
-            />
-          </View>
-
-          <Text style={styles.title}>Vérification en cours...</Text>
-          <Text style={styles.subtitle}>
-            Nous vérifions votre accès à Lotus Business.
-          </Text>
-
-          {/* Steps */}
           <View style={styles.stepsContainer}>
             <StepItem label="Connexion Google" status={steps.google} />
             <StepItem
@@ -116,13 +243,26 @@ export default function VerifyingScreen() {
           </View>
         </View>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <ProgressBar progress={progress} showPercent={false} />
           <Text style={styles.footerText}>{footerText}</Text>
         </View>
       </View>
+
+      <CustomAlert
+        isVisible={alertVisible}
+        onClose={() => setAlertVisible(false)}
+        title={alertData.title}
+        description={alertData.description}
+        iconName={alertData.iconName}
+        color={alertData.color}
+        primaryButtonLabel={alertData.primaryButtonLabel || "Compris"}
+        onPrimaryPress={alertData.onPrimaryPress}
+        secondaryButtonLabel={alertData.secondaryButtonLabel}
+        onSecondaryPress={alertData.onSecondaryPress}
+      />
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
@@ -131,9 +271,31 @@ function delay(ms: number) {
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
+  },
+  header: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  skipButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 20,
+  },
+  skipText: {
+    ...TextStyles.buttonSm,
+    fontFamily: FontFamily.medium,
+    color: Colors.textPrimary,
   },
   container: {
     flex: 1,
@@ -148,7 +310,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   spinnerContainer: {
-    marginBottom: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: 100,
   },
   spinnerOuter: {
     width: 52,
@@ -167,12 +332,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TextStyles.h2,
+    fontFamily: FontFamily.display,
     color: Colors.textPrimary,
     textAlign: "center",
     marginTop: 4,
   },
   subtitle: {
     ...TextStyles.body,
+    fontFamily: FontFamily.content,
     color: Colors.textSecondary,
     textAlign: "center",
   },
@@ -190,6 +357,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     ...TextStyles.caption,
+    fontFamily: FontFamily.content,
     color: Colors.textSecondary,
     textAlign: "center",
   },

@@ -1,22 +1,18 @@
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { usePathname, useRouter } from "expo-router";
 import {
-  AlertTriangle,
   ChevronRight,
-  Cloud,
   FileText,
   HelpCircle,
-  History,
   LayoutGrid,
   LogOut,
-  Package,
   User,
-  LayersPlus,
 } from "lucide-react-native";
 import React from "react";
 import {
-  Alert,
   Image,
+  ImageBackground,
+  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -24,18 +20,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Colors } from "@/constants/colors";
 import { FontFamily } from "@/constants/typography";
 import { useAuthStore } from "../../store/useAuthStore";
+
+// 👉 Remplace ce chemin par ton image réelle
+const DRAWER_BG = require("@/assets/drawer.png");
 
 interface DrawerItemProps {
   label: string;
   icon: React.ReactNode;
   isActive?: boolean;
   onPress?: () => void;
-  activeColor?: string;
-  activeSurface?: string;
-  activeBorder?: string;
 }
 
 interface DrawerMenuItem {
@@ -43,149 +38,84 @@ interface DrawerMenuItem {
   href: string;
   icon: (color: string) => React.ReactNode;
   matches: (pathname: string) => boolean;
-  activeColor: string;
-  activeSurface: string;
-  activeBorder: string;
 }
 
-const DrawerItem = ({
-  label,
-  icon,
-  isActive,
-  onPress,
-  activeColor,
-  activeSurface,
-  activeBorder,
-}: DrawerItemProps) => (
+const DrawerItem = ({ label, icon, isActive, onPress }: DrawerItemProps) => (
   <TouchableOpacity
-    style={[
-      styles.menuItem,
-      isActive && {
-        backgroundColor: activeSurface,
-        borderWidth: 1,
-        borderColor: activeBorder,
-      },
-    ]}
+    style={[styles.menuItem, isActive && styles.menuItemActive]}
     onPress={onPress}
     activeOpacity={0.7}
   >
     <View style={styles.menuItemContent}>
-      <View
-        style={[styles.iconContainer, isActive && styles.iconContainerActive]}
-      >
+      <View style={[styles.iconContainer, isActive && styles.iconContainerActive]}>
         {icon}
       </View>
       <Text
         style={[
           styles.menuLabel,
-          isActive && {
-            color: activeColor,
-            fontFamily: FontFamily.utilityBold,
-          },
+          isActive && { color: "#0A0A0A", fontFamily: FontFamily.utilityBold },
         ]}
       >
         {label}
       </Text>
     </View>
-    {isActive && <ChevronRight size={16} color={activeColor} />}
+    {isActive && <ChevronRight size={16} color="#0A0A0A" />}
   </TouchableOpacity>
 );
-
-function getInitials(name: string | null): string {
-  if (!name) return "?";
-  const parts = name.trim().split(" ");
-  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?";
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 export default function DrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { boutique, displayName, email, photoURL, logout } = useAuthStore();
+  const { logout } = useAuthStore();
 
   const menuItems: DrawerMenuItem[] = [
     {
       label: "Accueil",
       href: "/",
       icon: (color) => <LayoutGrid size={20} color={color} />,
-      matches: (currentPath) => currentPath === "/",
-      activeColor: "#16A34A",
-      activeSurface: "#ECFDF3",
-      activeBorder: "#BBF7D0",
+      matches: (p) => p === "/",
     },
     {
-      label: "Stock",
-      href: "/stock",
-      icon: (color) => <Package size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/stock"),
-      activeColor: "#2563EB",
-      activeSurface: "#EFF6FF",
-      activeBorder: "#BFDBFE",
-    },
-    {
-      label: "Inventaire",
-      href: "/inventaire",
-      icon: (color) => <LayersPlus size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/inventaire"),
-      activeColor: "#16A34A",
-      activeSurface: "#ECFDF3",
-      activeBorder: "#BBF7D0",
+      label: "Profil",
+      href: "/profil",
+      icon: (color) => <User size={20} color={color} />,
+      matches: (p) => p.startsWith("/profil"),
     },
     {
       label: "Historique des ventes",
       href: "/historique-ventes",
       icon: (color) => <FileText size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/historique-ventes"),
-      activeColor: "#EA580C",
-      activeSurface: "#FFF7ED",
-      activeBorder: "#FED7AA",
-    },
-    {
-      label: "Alertes stock",
-      href: "/alertes-stock",
-      icon: (color) => <AlertTriangle size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/alertes-stock"),
-      activeColor: "#DC2626",
-      activeSurface: "#FEF2F2",
-      activeBorder: "#FECACA",
-    },
-    {
-      label: "Historique des bilans",
-      href: "/historique-bilans",
-      icon: (color) => <History size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/historique-bilans"),
-      activeColor: "#7C3AED",
-      activeSurface: "#F3E8FF",
-      activeBorder: "#D8B4FE",
-    },
-    {
-      label: "Exports & PDF",
-      href: "/documents",
-      icon: (color) => <Cloud size={20} color={color} />,
-      matches: (currentPath) =>
-        currentPath.startsWith("/documents") ||
-        currentPath.startsWith("/exports-pdf"),
-      activeColor: "#0891B2",
-      activeSurface: "#ECFEFF",
-      activeBorder: "#A5F3FC",
-    },
-    {
-      label: "Ma boutique",
-      href: "/profil",
-      icon: (color) => <User size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/profil"),
-      activeColor: "#4F46E5",
-      activeSurface: "#EEF2FF",
-      activeBorder: "#C7D2FE",
+      matches: (p) => p.startsWith("/historique-ventes"),
     },
     {
       label: "Aide",
       href: "/aide",
       icon: (color) => <HelpCircle size={20} color={color} />,
-      matches: (currentPath) => currentPath.startsWith("/aide"),
-      activeColor: "#6B7280",
-      activeSurface: "#F9FAFB",
-      activeBorder: "#D1D5DB",
+      matches: (p) => p.startsWith("/aide"),
+    },
+  ];
+
+  const socialLinks = [
+
+    {
+      key: "Gmail",
+      png: "https://i.pinimg.com/736x/da/da/17/dada173dafaf9854d9045009e3f86f61.jpg",
+      url: "https://mail.google.com",
+    },
+    {
+      key: "facebook",
+      png: "https://i.pinimg.com/736x/49/47/52/494752f8b49a44aac5a152ddcb70c95d.jpg",
+      url: "https://facebook.com",
+    },
+    {
+      key: "instagram",
+      png: "https://i.pinimg.com/736x/04/05/ed/0405eda56f4151d8cc4c4408f34ba1c9.jpg",
+      url: "https://instagram.com",
+    },
+    {
+      key: "whatsapp",
+      png: "https://i.pinimg.com/736x/52/16/49/5216499f3137ba1f69694d5b7b9f549a.jpg",
+      url: "https://wa.me/",
     },
   ];
 
@@ -194,49 +124,36 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
     router.replace(href as never);
   };
 
-  const boutiqueName = boutique?.nom?.trim();
-  const profileTitle = boutiqueName || "Ma boutique";
-  const profileSubtitle = displayName ?? email ?? "Configuration en attente";
+  const handleLogout = async () => {
+    props.navigation.closeDrawer();
+    await logout();
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require("../../../assets/images/logo-black.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <View>
+    <ImageBackground
+      source={DRAWER_BG}
+      style={styles.bgImage}
+      resizeMode="cover"
+    >
+      {/* Overlay léger pour garder la lisibilité */}
+      <View style={styles.overlay} />
+
+      <SafeAreaView style={styles.container}>
+        {/* HEADER */}
+        <View style={styles.header}>
           <Text style={styles.appName}>Lotus Business</Text>
-          {/* <Text style={styles.appTagline}>Pilote ta boutique au quotidien</Text> */}
         </View>
-      </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* <View style={styles.profileSection}>
-          {photoURL ? (
-            <Image source={{ uri: photoURL }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarInitials}>{getInitials(displayName)}</Text>
-            </View>
-          )}
+        <View style={styles.divider} />
 
-          <Text style={styles.userName}>{profileTitle}</Text>
-          <Text style={styles.userEmail} numberOfLines={1}>
-            {profileSubtitle}
-          </Text>
-        </View> */}
-
-        <View style={styles.menuContainer}>
-          <Text style={styles.menuSectionTitle}>Menu</Text>
+        {/* MENU */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
           {menuItems.map((item) => {
             const isActive = item.matches(pathname);
-            const iconColor = isActive ? item.activeColor : "#4B5563";
-
+            const iconColor = isActive ? "#FFFFFF" : "#9CA3AF";
             return (
               <DrawerItem
                 key={item.label}
@@ -244,123 +161,102 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                 icon={item.icon(iconColor)}
                 isActive={isActive}
                 onPress={() => handleNavigate(item.href)}
-                activeColor={item.activeColor}
-                activeSurface={item.activeSurface}
-                activeBorder={item.activeBorder}
               />
             );
           })}
-        </View>
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.logoutButton}
-            // onPress={handleLogout}
-            activeOpacity={0.7}
-          >
-            <LogOut size={18} color={Colors.danger} />
-            <Text style={styles.logoutText}>Se déconnecter</Text>
-          </TouchableOpacity>
 
-        {/* <View style={styles.footerInfo}>
-          <Text style={styles.footerTitle}>Lotus Business</Text>
-          <Text style={styles.footerSubtitle}>Offline first, pensé pour le terrain</Text>
-        </View> */}
-        </View>
-        
-      </ScrollView>
-    </SafeAreaView>
+          
+        </ScrollView>
+{/* SOCIAL ICONS */}
+          <View style={styles.socialRow}>
+            {socialLinks.map((s) => (
+              <TouchableOpacity
+                key={s.key}
+                style={styles.socialButton}
+                onPress={() => Linking.openURL(s.url)}
+                activeOpacity={0.6}
+              >
+                <Image
+                  source={{ uri: s.png }}
+                  style={styles.socialIcon}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        {/* FOOTER — LOGOUT */}
+        <View style={styles.divider} />
+        <TouchableOpacity style={styles.footer} onPress={handleLogout} activeOpacity={0.7}>
+          <LogOut size={18} color="#9CA3AF" />
+          <Text style={styles.footerLabel}>Déconnexion</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  bgImage: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    paddingBottom: 12,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 24,
+    gap: 10,
+    paddingTop: 40,
+    paddingHorizontal: 20,
     paddingVertical: 20,
-    gap: 12,
   },
-  logo: {
-    width: 38,
-    height: 38,
-  },
-  appName: {
-    fontSize: 20,
-    fontWeight: "700",
-    fontFamily: FontFamily.display,
-    color: Colors.textPrimary,
-    letterSpacing: 1.5,
-  },
-  appTagline: {
-    marginTop: 2,
-    fontSize: 12,
-    fontFamily: FontFamily.content,
-    color: Colors.textSecondary,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  profileSection: {
-    paddingHorizontal: 24,
-    marginTop: 8,
-    marginBottom: 24,
-    gap: 4,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginBottom: 10,
-  },
-  avatarFallback: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.textPrimary,
+  logoMark: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#0A0A0A",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
   },
-  avatarInitials: {
-    fontSize: 18,
+  logoMarkText: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontFamily: FontFamily.utilityBold,
-    color: Colors.textInverse,
-    letterSpacing: 0.5,
   },
-  userName: {
-    fontSize: 20,
+  appName: {
+    fontSize: 24,
     fontFamily: FontFamily.display,
-    color: Colors.textPrimary,
+    color: "#0A0A0A",
+    letterSpacing: -0.3,
   },
-  userEmail: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontFamily: FontFamily.content,
+  divider: {
+    height: 0.5,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 20,
   },
-  menuContainer: {
-    paddingHorizontal: 16,
-  },
-  menuSectionTitle: {
-    marginBottom: 10,
-    paddingHorizontal: 8,
-    fontSize: 12,
-    fontFamily: FontFamily.utilityBold,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
-    textTransform: "uppercase",
+  scrollContent: {
+    paddingTop: 5,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    flexGrow: 1,
+    justifyContent: "center",
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 10,
-    borderRadius: 16,
-    marginBottom: 6,
+    borderRadius: 14,
+    marginBottom: 4,
+    backgroundColor: "transparent",
+  },
+  menuItemActive: {
+    backgroundColor: "rgba(245, 245, 245, 0.9)",
   },
   menuItemContent: {
     flexDirection: "row",
@@ -374,53 +270,50 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4F6",
+    borderWidth: 0.5,
+    borderColor: "#E5E7EB",
+    backgroundColor: "rgba(255,255,255,0.7)",
   },
   iconContainerActive: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#0A0A0A",
+    borderColor: "#0A0A0A",
   },
   menuLabel: {
     fontSize: 14,
-    color: "#4B5563",
+    color: "#9CA3AF",
     fontFamily: FontFamily.utility,
     flexShrink: 1,
   },
-  footer: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    gap: 16,
-    backgroundColor: Colors.background,
-  },
-  footerInfo: {
-    gap: 2,
-  },
-  footerTitle: {
-    fontSize: 14,
-    fontFamily: FontFamily.utilityBold,
-    color: Colors.textPrimary,
-  },
-  footerSubtitle: {
-    fontSize: 12,
-    fontFamily: FontFamily.content,
-    color: Colors.textSecondary,
-  },
-  logoutButton: {
+  socialRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    backgroundColor: Colors.dangerLight,
-    borderWidth: 1,
-    borderColor: Colors.dangerBorder,
-    borderRadius: 14,
-    paddingVertical: 14,
+    marginTop: 20,
+    paddingHorizontal: 4,
   },
-  logoutText: {
-    color: Colors.dangerText,
+  socialButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.85)",
+  },
+  socialIcon: {
+    width: 38,
+    height: 38,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  footerLabel: {
     fontSize: 14,
-    fontFamily: FontFamily.utilityBold,
+    fontFamily: FontFamily.utility,
+    color: "#9CA3AF",
   },
 });

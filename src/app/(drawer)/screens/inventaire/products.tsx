@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Search, ArrowLeft, Filter, Plus } from 'lucide-react-native';
-import { DUMMY_PRODUITS, DUMMY_CATEGORIES, DummyProduit } from './dummyData';
+import { openDatabaseSync } from 'expo-sqlite';
 
 const colors = {
   background: '#FAFAFA',
@@ -22,18 +22,41 @@ export default function ProductsListScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('Tout');
+  const [produits, setProduits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
 
-  const filteredProducts = DUMMY_PRODUITS.filter(p => {
+  const fetchData = useCallback(async () => {
+    try {
+      const db = openDatabaseSync("lotus_business.db");
+      const allProduits = await db.getAllAsync<any>("SELECT * FROM produits ORDER BY nom ASC");
+      setProduits(allProduits);
+
+      const distinctCats = await db.getAllAsync<{ categorie: string }>(
+        "SELECT DISTINCT categorie FROM produits"
+      );
+      setCategories(distinctCats.map(c => c.categorie));
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
+
+  const filteredProducts = produits.filter(p => {
     const matchCat = activeCategory === 'Tout' || p.categorie === activeCategory;
     const matchSearch = p.nom.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
 
-  const renderProduct = ({ item }: { item: DummyProduit }) => {
-    const isAlert = item.stockActuel <= item.stockMin;
-    const prixAffiche = item.prixPiece 
-      ? `${item.prixPiece.toLocaleString('fr-FR')} FCFA / pièce`
-      : `${item.prixCarton?.toLocaleString('fr-FR')} FCFA / carton`;
+  const renderProduct = ({ item }: { item: any }) => {
+    const isAlert = item.stock_actuel <= item.stock_min;
+    const prixAffiche = item.prix_unitaire 
+      ? `${item.prix_unitaire.toLocaleString('fr-FR')} FCFA / pièce`
+      : `${item.prix_carton?.toLocaleString('fr-FR')} FCFA / carton`;
 
     return (
       <TouchableOpacity 
@@ -44,12 +67,12 @@ export default function ProductsListScreen() {
           <Text style={styles.cardTitle}>{item.nom}</Text>
           <Text style={styles.cardCategory}>{item.categorie}</Text>
           <Text style={styles.cardPrice}>{prixAffiche}</Text>
-          {item.typeVente === 'les_deux' && <Text style={styles.cardPriceSecondary}>{item.prixCarton?.toLocaleString('fr-FR')} FCFA / carton</Text>}
+          {item.type_vente === 'les_deux' && <Text style={styles.cardPriceSecondary}>{item.prix_carton?.toLocaleString('fr-FR')} FCFA / carton</Text>}
         </View>
         <View style={styles.cardStatusBox}>
           <View style={[styles.stockBadge, isAlert ? styles.stockBadgeAlert : styles.stockBadgeOk]}>
             <Text style={[styles.stockBadgeText, isAlert ? styles.stockBadgeTextAlert : styles.stockBadgeTextOk]}>
-              {item.stockActuel} en stock
+              {item.stock_actuel} en stock
             </Text>
           </View>
         </View>
@@ -92,7 +115,7 @@ export default function ProductsListScreen() {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={['Tout', ...DUMMY_CATEGORIES]}
+          data={['Tout', ...categories]}
           keyExtractor={(item) => item}
           contentContainerStyle={{ paddingHorizontal: 20 }}
           renderItem={({ item }) => (
@@ -143,7 +166,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: 'Outfit_700Bold',
   },
   addButton: {
     padding: 8,
@@ -174,7 +197,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     color: colors.textPrimary,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'Outfit_400Regular',
     height: '100%',
   },
   filterButton: {
@@ -209,7 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'Outfit_500Medium',
   },
   categoryPillTextActive: {
     color: '#FFF',
@@ -240,19 +263,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 4,
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
   },
   cardCategory: {
     fontSize: 13,
     color: colors.textSecondary,
     marginBottom: 8,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'Outfit_400Regular',
   },
   cardPrice: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.textPrimary,
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: 'Outfit_700Bold',
   },
   cardPriceSecondary: {
     fontSize: 13,

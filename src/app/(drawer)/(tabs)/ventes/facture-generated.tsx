@@ -1,12 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { FileText, Printer, CheckCircle, X, Share2 } from 'lucide-react-native';
+import { FileText, Printer, CheckCircle, X, Share2, Cloud } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
 import { FontFamily, FontSize } from '@/constants/typography';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function FactureGeneratedScreen() {
   const router = useRouter();
+  const { id, total } = useLocalSearchParams();
+
+  const formattedTotal = total 
+    ? Number(total).toLocaleString('fr-FR') + ' FCFA'
+    : '0 FCFA';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,15 +62,15 @@ export default function FactureGeneratedScreen() {
         <View style={styles.previewHeader}>
           <View>
             <Text style={styles.previewLabel}>FACTURE NO.</Text>
-            <Text style={styles.previewId}>INV-2024-082</Text>
+            <Text style={styles.previewId}>{id || '---'}</Text>
           </View>
           <View style={styles.fileIcon}>
-            <FileText size={20} color={Colors.textInverse} />
+            <FileText size={20} color="#FFF" />
           </View>
         </View>
         <View style={styles.previewFooter}>
           <Text style={styles.totalLabel}>Total TTC</Text>
-          <Text style={styles.totalValue}>1.450,00 €</Text>
+          <Text style={styles.totalValue}>{formattedTotal}</Text>
         </View>
       </View>
       
@@ -74,12 +79,13 @@ export default function FactureGeneratedScreen() {
   );
 }
 
-import { Cloud } from 'lucide-react-native';
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
+    paddingTop: 30,
   },
   header: {
     flexDirection: 'row',

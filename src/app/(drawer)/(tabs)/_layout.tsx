@@ -1,6 +1,5 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import TabsBar from '@/components/customs/TabsBar';
 import Animated, { 
   useAnimatedStyle, 
@@ -14,25 +13,20 @@ export default function TabsLayout() {
   const progress = useDrawerProgress();
 
   const animatedStyle = useAnimatedStyle(() => {
-    // Échelle : de 1 (fermé) à 0.82 (ouvert)
-    const scale = interpolate(progress.value, [0, 1], [1, 0.82], Extrapolation.CLAMP);
-    
-    // Décalage vers le bas (translation Y)
-    const translateY = interpolate(progress.value, [0, 1], [0, 40], Extrapolation.CLAMP);
+    // Échelle : de 1 (fermé) à 0.85 (ouvert)
+    const scale = interpolate(progress.value, [0, 1], [1, 0.85], Extrapolation.CLAMP);
     
     // Border Radius : de 0 à 32
     const borderRadius = interpolate(progress.value, [0, 1], [0, 32], Extrapolation.CLAMP);
 
     return {
       transform: [
-        { scale }, 
-        { translateY },
-        { translateX: interpolate(progress.value, [0, 1], [0, -10], Extrapolation.CLAMP) } // Léger ajustement X
+        { scale }
       ],
       borderRadius,
       overflow: 'hidden',
     };
-  });
+  }); 
 
   return (
     <View style={styles.container}>
@@ -62,33 +56,9 @@ export default function TabsLayout() {
             }}
           />
           <Tabs.Screen
-            name="sauvegarde"
+            name="move/index"
             options={{
-              title: 'PDF',
-            }}
-          />
-          <Tabs.Screen
-            name="profil/index"
-            options={{
-              href: null,
-            }}
-          />
-          <Tabs.Screen
-            name="ventes/nouvelle"
-            options={{
-              href: null,
-            }}
-          />
-          <Tabs.Screen
-            name="ventes/success"
-            options={{
-              href: null,
-            }}
-          />
-          <Tabs.Screen
-            name="ventes/facture-generated"
-            options={{
-              href: null,
+              title: 'MOUVEMENTS',
             }}
           />
         </Tabs>
@@ -100,15 +70,10 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'transparent',
   },
   animatedWrapper: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    // shadowColor: "#000",
-    // shadowOffset: { width: 0, height: 10 },
-    // shadowOpacity: 0.3,
-    // shadowRadius: 20,
-    // elevation: 10,
   },
 });

@@ -113,12 +113,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TextStyles.h1,
+    fontFamily: FontFamily.display,
     color: Colors.textPrimary,
     marginBottom: 12,
     textAlign: 'center',
   },
   subtitle: {
     ...TextStyles.body,
+    fontFamily: FontFamily.content,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
@@ -168,6 +170,7 @@ const styles = StyleSheet.create({
   },
   helpText: {
     ...TextStyles.bodySm,
+    fontFamily: FontFamily.content,
     color: Colors.textSecondary,
   },
   underlineText: {

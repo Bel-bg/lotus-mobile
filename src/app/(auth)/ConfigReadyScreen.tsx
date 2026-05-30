@@ -4,7 +4,7 @@
 
 import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
-import { StatusBar, StyleSheet, Text, View } from 'react-native'
+import { StatusBar, StyleSheet, Text, View, Image } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -15,7 +15,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ProgressBar from '../../components/ProgressBar'
-import TopBar from '../../components/customs/TopBar'
+import { FontFamily } from '@/constants/typography'
 
 export default function ConfigReadyScreen() {
   const router = useRouter()
@@ -66,9 +66,6 @@ export default function ConfigReadyScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-      <TopBar />
-
       <View style={styles.container}>
 
         {/* Zone centrale */}
@@ -76,7 +73,7 @@ export default function ConfigReadyScreen() {
 
           {/* Icône check */}
           <Animated.View style={[styles.checkContainer, checkStyle]}>
-            <Text style={styles.checkIcon}>✓</Text>
+            <Image source={require('@/assets/images/sucess.png')} style={{ width: 72, height: 72, resizeMode: 'contain' }} />
           </Animated.View>
 
           {/* Titre */}
@@ -124,31 +121,30 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   checkContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: '#0A0A0A',
+    width: 92,
+    height: 92,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
   checkIcon: {
     fontSize: 32,
-    color: '#FFFFFF',
     fontWeight: '700',
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: FontFamily.display,
     color: '#0A0A0A',
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 14,
+    fontFamily: FontFamily.content,
     color: '#6B6B6B',
     textAlign: 'center',
     lineHeight: 22,
+    letterSpacing: 0.5,
   },
   footer: {
     gap: 8,

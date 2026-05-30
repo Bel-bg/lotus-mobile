@@ -24,6 +24,7 @@ import {
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
 import { useRouter, router } from "expo-router";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface ProfileItemProps {
   icon: any;
@@ -36,7 +37,7 @@ interface ProfileItemProps {
   onSwitchChange?: (val: boolean) => void;
   destructive?: boolean;
 }
-const StoreName = "Boutique Adjoua";
+
 const ProfileItem = ({
   icon: Icon,
   label,
@@ -51,7 +52,7 @@ const ProfileItem = ({
   const Card = onPress ? TouchableOpacity : View;
 
   return (
-    <Card style={styles.itemContainer} onPress={onPress}>
+    <Card style={styles.itemContainer} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.itemLeading}>
         <View
           style={[styles.iconBox, destructive && styles.iconBoxDestructive]}
@@ -87,10 +88,27 @@ const ProfileItem = ({
 
 export default function ProfileScreen() {
   const [autoBackup, setAutoBackup] = React.useState(true);
+  
+  const boutique = useAuthStore(s => s.boutique);
+  const email = useAuthStore(s => s.email);
+
+  const shopName = boutique?.nom || "Ma Boutique";
+  const managerName = boutique?.gerant || boutique?.proprietaire || "Non renseigné";
+  const currency = boutique?.devise || "FCFA";
+  const phone = boutique?.telephone || "Non renseigné";
+  const userEmail = email || boutique?.email || "Non renseigné";
+  
+  const getInitials = (name: string) => {
+    if (!name) return "B";
+    const parts = name.trim().split(" ");
+    if (parts.length > 1) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* <CustomTopBar type="profil" /> */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -101,13 +119,10 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle} selectable>
-          {StoreName}
+          {shopName}
         </Text>
 
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.75}
-        >
+        <TouchableOpacity style={styles.iconButton} activeOpacity={0.75}>
           <Settings2 size={18} color={Colors.textPrimary} strokeWidth={2.4} />
         </TouchableOpacity>
       </View>
@@ -120,14 +135,14 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>BA</Text>
+              <Text style={styles.avatarText}>{getInitials(shopName)}</Text>
             </View>
             <TouchableOpacity style={styles.editAvatar}>
               <Edit2 size={16} color={Colors.textInverse} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.shopName}>Boutique Adjoua</Text>
-          <Text style={styles.managerName}>Adjoua Koffi</Text>
+          <Text style={styles.shopName}>{shopName}</Text>
+          <Text style={styles.managerName}>{managerName}</Text>
         </View>
 
         <View style={styles.section}>
@@ -135,17 +150,19 @@ export default function ProfileScreen() {
           <ProfileItem
             icon={Smartphone}
             label="Nom de la boutique"
+            value={shopName}
             onPress={() => {}}
           />
           <ProfileItem
             icon={Database}
             label="Devise"
-            value="FCFA"
+            value={currency}
             onPress={() => {}}
           />
           <ProfileItem
             icon={Info}
             label="Numéro de téléphone"
+            value={phone}
             onPress={() => {}}
           />
         </View>
@@ -155,7 +172,7 @@ export default function ProfileScreen() {
           <ProfileItem
             icon={Cloud}
             label="Compte Google"
-            value="adjoua@gmail.com"
+            value={userEmail}
             onPress={() => {}}
           />
           <ProfileItem
@@ -211,6 +228,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+    paddingTop: 30,
   },
   header: {
     paddingTop: 6,
@@ -239,7 +257,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: Colors.textPrimary,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "Outfit_700Bold",
   },
   content: {
     flex: 1,

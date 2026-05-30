@@ -1,1 +1,1 @@
-export { default } from "./(tabs)/sauvegarde/documents";
+export { default } from "./screens/sauvegarde/documents";

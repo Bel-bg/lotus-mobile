@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,27 +6,24 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  Dimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
-  LucideIcon,
   Package,
-  AlertTriangle,
   ArrowRightLeft,
   Tags,
+  Barcode,
   Plus,
   LayoutGrid,
   ChevronRight,
   ArrowLeft,
-  LayersPlus,
-  Info,
+  ScanBarcode,
+  AlertTriangle,
+  InfoIcon,
 } from "lucide-react-native";
-import { DUMMY_PRODUITS, DUMMY_CATEGORIES } from "./dummyData";
 import { Colors } from "../../../../constants/colors";
 import CustomAlert from "../../../../components/customs/Alert";
-
-const { width } = Dimensions.get("window");
+import { initDB } from "@/lib/db/schema";
 
 const colors = {
   background: "#FAFAFA",
@@ -47,46 +44,47 @@ const colors = {
 export default function InventaireDashboard() {
   const router = useRouter();
   const [alertVisible, setAlertVisible] = useState(false);
+  const [produits, setProduits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
 
-  // Calculs depuis les dummy data
-  const totalProduits = DUMMY_PRODUITS.length;
-  const valeurStock = DUMMY_PRODUITS.reduce((acc, p) => {
-    let prix =
-      p.prixPiece ||
-      (p.prixCarton && p.unitesParCarton
-        ? p.prixCarton / p.unitesParCarton
-        : 0);
-    return acc + prix * p.stockActuel;
+  const fetchStats = useCallback(async () => {
+    try {
+      const db = await initDB();
+      
+      // Fetch all products
+      const allProduits = await db.getAllAsync<any>("SELECT * FROM produits");
+      setProduits(allProduits);
+
+      // Fetch unique categories
+      const distinctCats = await db.getAllAsync<{ nom: string }>(
+        "SELECT nom FROM categories"
+      );
+      setCategories(distinctCats.map(c => c.nom));
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [fetchStats])
+  );
+
+  // Calculs dynamiques
+  const totalProduits = produits.length;
+  const totalCategories = categories.length;
+  const valeurStock = produits.reduce((acc, p) => {
+    let prix = p.prix_unitaire || (p.prix_carton && p.unites_par_carton ? p.prix_carton / p.unites_par_carton : 0);
+    return acc + (prix * p.stock_actuel);
   }, 0);
-
-  const alertesCount = DUMMY_PRODUITS.filter(
-    (p) => p.stockActuel <= p.stockMin,
-  ).length;
+  
+  const valeurMoyenneProduit = totalProduits > 0 ? Math.round(valeurStock / totalProduits) : 0;
+  const alertesCount = produits.filter((p) => p.stock_actuel <= p.stock_min).length;
+  const produitsEnAlerte = produits.filter((p) => p.stock_actuel <= p.stock_min).slice(0, 3);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Custom */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.iconButton}
-          activeOpacity={0.75}
-        >
-          <ArrowLeft size={20} color={Colors.textPrimary} strokeWidth={2.4} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle} selectable>
-          Inventaires
-        </Text>
-
-        <TouchableOpacity
-          onPress={() => setAlertVisible(true)}
-          style={styles.iconButton}
-          activeOpacity={0.75}
-        >
-          <Info size={18} color={Colors.textPrimary} strokeWidth={2.4} />
-        </TouchableOpacity>
-      </View>
 
       <ScrollView
         style={styles.content}
@@ -95,51 +93,56 @@ export default function InventaireDashboard() {
       >
         {/* Valeur du stock total */}
         <View style={styles.valeurCard}>
-          <Text style={styles.valeurCardLabel}>Valeur estimée du stock</Text>
-          <Text style={styles.valeurCardValue}>
-            {valeurStock.toLocaleString("fr-FR")} FCFA
-          </Text>
-          <View style={styles.valeurBadge}>
-            <Text style={styles.valeurBadgeText}>Mis à jour à l'instant</Text>
-          </View>
-        </View>
-        {/* Kpis Grid */}
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <View style={[styles.iconWrapper, { backgroundColor: "#F3F4F6" }]}>
-              <Package size={20} color={colors.textPrimary} />
+          <View style={styles.valeurHeaderRow}>
+            <View style={styles.valeurTitleGroup}>
+              <View style={styles.valeurIconShell}>
+                <Package size={18} color={"#D97706"} strokeWidth={2.2} />
+              </View>
+              <View>
+                <Text style={styles.valeurEyebrow}>APERÇU INVENTAIRE</Text>
+                <Text style={styles.valeurCardLabel}>
+                  Valeur estimée du stock
+                </Text>
+              </View>
             </View>
-            <Text style={styles.metricLabel}>Total Produits</Text>
-            <Text style={styles.metricValue}>{totalProduits}</Text>
+
+            <View style={styles.valeurBadge}>
+              <View style={styles.valeurBadgeDot} />
+              <Text style={styles.valeurBadgeText}>Mis à jour</Text>
+            </View>
           </View>
 
-          <View style={styles.metricCard}>
-            <View
-              style={[
-                styles.iconWrapper,
-                { backgroundColor: colors.warningLight },
-              ]}
-            >
-              <AlertTriangle size={20} color={colors.warning} />
-            </View>
-            <Text style={styles.metricLabel}>Alertes Stock</Text>
-            <Text
-              style={[
-                styles.metricValue,
-                {
-                  color: alertesCount > 0 ? colors.danger : colors.textPrimary,
-                },
-              ]}
-            >
-              {alertesCount}
+          <View style={styles.valeurMainRow}>
+            <Text style={styles.valeurCardValue}>
+              {valeurStock.toLocaleString("fr-FR")}
             </Text>
+            <Text style={styles.valeurCurrency}>FCFA</Text>
           </View>
+
+          <Text style={styles.valeurDescription}>
+            Calcul dynamique basé sur les quantités disponibles et le prix
+            unitaire actuel de votre catalogue.
+          </Text>
+
+
+          <View style={styles.valeurDivider} />
+
+        <Text style={styles.sectionTitle}>Action Rapide</Text>
+          <MenuButton
+            title="Scanner"
+            subtitle="Scannage rapide d'un produit"
+            icon={Barcode}
+            color="#f6a53b"
+            onPress={() =>
+              router.push("/(drawer)/screens/inventaire/POScan/new")
+            }
+          />
         </View>
 
         <Text style={styles.sectionTitle}>Gestion Rapide</Text>
 
         {/* Navigation Menu */}
-        <View style={styles.menuContainer}>
+        <View>
           <MenuButton
             title="Catalogue Complet"
             subtitle="Voir et filtrer tous les produits"
@@ -158,7 +161,7 @@ export default function InventaireDashboard() {
           />
           <MenuButton
             title="Catégories"
-            subtitle={`${DUMMY_CATEGORIES.length} catégories configurées`}
+            subtitle={`${totalCategories} catégories configurées`}
             icon={Tags}
             color="#8B5CF6"
             onPress={() =>
@@ -183,17 +186,15 @@ export default function InventaireDashboard() {
               </TouchableOpacity>
             </View>
 
-            {DUMMY_PRODUITS.filter((p) => p.stockActuel <= p.stockMin)
-              .slice(0, 3)
-              .map((prod) => (
+            {produitsEnAlerte.map((prod) => (
                 <View key={prod.id} style={styles.alertItem}>
-                  <View style={styles.alertItemInfo}>
+                  <View style={styles.alertItemScanBarcode}>
                     <Text style={styles.alertItemName}>{prod.nom}</Text>
                     <Text style={styles.alertItemCat}>{prod.categorie}</Text>
                   </View>
                   <View style={styles.alertItemBadge}>
                     <Text style={styles.alertItemBadgeText}>
-                      Reste {prod.stockActuel}
+                      Reste {prod.stock_actuel}
                     </Text>
                   </View>
                 </View>
@@ -239,10 +240,10 @@ const MenuButton = ({ title, subtitle, icon: Icon, color, onPress }: any) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
   },
   header: {
-    paddingTop: 6,
+    paddingTop: 30,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: colors.primary,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "Outfit_700Bold",
   },
   addButton: {
     width: 44,
@@ -286,87 +287,186 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  metricsGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  metricCard: {
-    width: (width - 56) / 2,
-    backgroundColor: colors.surface,
-    padding: 16,
-    borderRadius: 16,
-    elevation: 0.5,
-  },
-  iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  metricLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 4,
-    fontFamily: "DMSans_500Medium",
-  },
-  metricValue: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    fontFamily: "DMSans_700Bold",
-  },
   valeurCard: {
-    backgroundColor: colors.accent,
-    padding: 24,
-    borderRadius: 20,
-    marginBottom: 24,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: "transparent",
+    // borderWidth: 1,
+    // borderColor: colors.border,
+    // padding: 24,
+    // borderRadius: 20,
+    // marginBottom: 24,
+  },
+  valeurGlowPrimary: {
+    position: "absolute",
+    top: -54,
+    right: -28,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: "rgba(217, 119, 6, 0.04)",
+  },
+  valeurGlowSecondary: {
+    position: "absolute",
+    bottom: -66,
+    left: -42,
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    backgroundColor: "rgba(10, 10, 10, 0.03)",
+  },
+  valeurHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 20,
+  },
+  valeurTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  valeurIconShell: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.warningLight,
+  },
+  valeurEyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.4,
+    marginBottom: 4,
+    fontFamily: "Outfit_700Bold",
   },
   valeurCardLabel: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 14,
-    marginBottom: 8,
-    fontFamily: "DMSans_500Medium",
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  valeurMainRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    marginBottom: 10,
   },
   valeurCardValue: {
-    color: "#FFF",
-    fontSize: 32,
+    color: colors.textPrimary,
+    fontSize: 36,
     fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
+    letterSpacing: -1.2,
+  },
+  valeurCurrency: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginLeft: 8,
+    marginBottom: 6,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  valeurDescription: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: "DMSans_400Regular",
     marginBottom: 16,
-    fontFamily: "DMSans_700Bold",
   },
   valeurBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 100,
+    borderRadius: 999,
+  },
+  valeurBadgeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: "#86EFAC",
+    marginRight: 6,
   },
   valeurBadgeText: {
-    color: "#FFF",
     fontSize: 12,
     fontWeight: "500",
-    fontFamily: "DMSans_500Medium",
+    fontFamily: "Outfit_500Medium",
+  },
+  valeurMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  valeurMetaPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FAFAFA",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  valeurMetaText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Outfit_500Medium",
+  },
+  valeurDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 18,
+  },
+  valeurInsightsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  insightCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#FCFCFC",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  insightCardAlert: {
+    backgroundColor: "#FCFCFC",
+  },
+  insightCardAlertDanger: {
+    backgroundColor: colors.dangerLight,
+    borderColor: "#FDD5D5",
+  },
+  insightIconShell: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  insightLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginBottom: 6,
+    fontFamily: "Outfit_500Medium",
+  },
+  insightValue: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    fontFamily: "Outfit_700Bold",
+  },
+  insightValueDanger: {
+    color: colors.danger,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: colors.textPrimary,
     marginBottom: 16,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "Outfit_700Bold",
   },
   menuContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 8,
-    marginBottom: 24,
+    gap: 1,
   },
   menuItem: {
     flexDirection: "row",
@@ -390,7 +490,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
     marginBottom: 4,
-    fontFamily: "DMSans_600SemiBold",
+    fontFamily: "Outfit_600SemiBold",
   },
   menuSubtitle: {
     fontSize: 13,
@@ -412,7 +512,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.danger,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "Outfit_700Bold",
   },
   seeAllText: {
     fontSize: 14,
@@ -427,7 +527,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  alertItemInfo: {
+  alertItemScanBarcode: {
     flex: 1,
   },
   alertItemName: {
@@ -494,6 +594,6 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 16,
     color: colors.textPrimary,
-    fontFamily: "DMSans_500Medium",
+    fontFamily: "Outfit_500Medium",
   },
 });

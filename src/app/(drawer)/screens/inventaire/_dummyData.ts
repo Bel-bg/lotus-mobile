@@ -83,3 +83,5 @@ export const DUMMY_PRODUITS: DummyProduit[] = [
     createdAt: new Date().toISOString(),
   },
 ];
+
+export default function IgnoredRoute() { return null; }

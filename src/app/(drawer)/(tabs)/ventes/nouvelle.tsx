@@ -1,41 +1,83 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TextInput, 
-  ScrollView, 
-  TouchableOpacity, 
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
   SafeAreaView,
   FlatList,
-  Platform
-} from 'react-native';
-import { Search, X, Plus, Minus, ArrowRight, ShoppingCart } from 'lucide-react-native';
-import { Colors } from '@/constants/colors';
-import { FontFamily, FontSize } from '@/constants/typography';
-import { useRouter } from 'expo-router';
+  Platform,
+} from "react-native";
+import {
+  Search,
+  X,
+  Plus,
+  Minus,
+  ArrowRight,
+  ShoppingCart,
+  ScanLine,
+} from "lucide-react-native";
+import { useRouter, useFocusEffect } from "expo-router";
+import { initDB } from "@/lib/db/schema";
+import { createVente } from "@/lib/db/ventes";
+import { Colors } from "@/constants/colors";
+import CustomAlert from "@/components/customs/Alert";
+import { FontFamily } from "@/constants/typography";
 
-// Mock data
-const PRODUCTS = [
-  { id: '1', name: 'Savon Lux', category: 'HYGIÈNE', price: 2200, stock: 142 },
-  { id: '2', name: 'Huile Palme', category: 'ALIMENTAIRE', price: 2200, stock: 38 },
-  { id: '3', name: 'Sucre', category: 'ALIMENTAIRE', price: 1000, stock: 8 },
-  { id: '4', name: 'Lait concentré', category: 'ALIMENTAIRE', price: 1800, stock: 95 },
-  { id: '5', name: 'Sac Riz 5kg', category: 'ALIMENTAIRE', price: 4500, stock: 12 },
-];
-
-const CATEGORIES = ['TOUS', 'HYGIÈNE', 'ALIMENTAIRE'];
 
 export default function NewSaleScreen() {
   const router = useRouter();
-  const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('TOUS');
-  const [cart, setCart] = useState<{[key: string]: number}>({});
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Tout");
+  const [cart, setCart] = useState<{ [key: string]: number }>({});
+  const [produits, setProduits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    description: string;
+  }>({ visible: false, title: "", description: "" });
+
+  const fetchData = useCallback(async () => {
+    try {
+      const db = await initDB();
+      const allProduits = await db.getAllAsync<any>("SELECT * FROM produits");
+      setProduits(allProduits);
+
+      const distinctCats = await db.getAllAsync<{ nom: string }>(
+        "SELECT nom FROM categories"
+      );
+      setCategories(["Tout", ...distinctCats.map(c => c.nom)]);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const updateCart = (id: string, delta: number) => {
-    setCart(prev => {
+    const p = produits.find(prod => prod.id === id);
+    if (!p) return;
+
+    setCart((prev) => {
       const current = prev[id] || 0;
       const next = Math.max(0, current + delta);
+      
+      if (next > p.stock_actuel) {
+        setAlertConfig({
+          visible: true,
+          title: "Stock insuffisant",
+          description: `Il ne reste que ${p.stock_actuel} unités de ${p.nom}.`,
+        });
+        return prev;
+      }
+
       if (next === 0) {
         const { [id]: _, ...rest } = prev;
         return rest;
@@ -44,40 +86,95 @@ export default function NewSaleScreen() {
     });
   };
 
-  const filteredProducts = PRODUCTS.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = activeCategory === 'TOUS' || p.category === activeCategory;
+  const filteredProducts = produits.filter((p) => {
+    const matchesSearch = p.nom.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory =
+      activeCategory === "Tout" || p.categorie === activeCategory;
     return matchesSearch && matchesCategory;
   });
 
   const cartItemsCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const cartTotal = Object.entries(cart).reduce((acc, [id, qty]) => {
-    const p = PRODUCTS.find(prod => prod.id === id);
-    return acc + (p?.price || 0) * qty;
+    const p = produits.find((prod) => prod.id === id);
+    return acc + (p?.prix_unitaire || 0) * qty;
   }, 0);
 
   const selectedProducts = Object.entries(cart).map(([id, qty]) => {
-    const p = PRODUCTS.find(prod => prod.id === id)!;
+    const p = produits.find((prod) => prod.id === id)!;
     return { ...p, qty };
   });
 
-  const handleConfirm = () => {
-    if (cartItemsCount > 0) {
-      // Navigate to success or confirmation
-      router.push('/(drawer)/(tabs)/ventes/success');
+  const handleConfirm = async () => {
+    if (selectedProducts.length === 0) return;
+
+    try {
+      const db = await initDB();
+      const panier: any[] = [];
+      
+      for (const item of selectedProducts) {
+        const p = await db.getFirstAsync<any>(
+          "SELECT * FROM produits WHERE id = ?",
+          [item.id]
+        );
+        if (!p) continue;
+
+        panier.push({
+          produit: {
+            id: p.id,
+            nom: p.nom,
+            categorie: p.categorie,
+            prixUnitaire: p.prix_unitaire,
+            prixCarton: p.prix_carton,
+            unitesParCarton: p.unites_par_carton,
+            typeVente: p.type_vente,
+            stockActuel: p.stock_actuel,
+            stockMin: p.stock_min,
+            stockMax: p.stock_max,
+            unite: p.unite,
+            createdAt: p.created_at,
+            updatedAt: p.updated_at
+          },
+          quantite: item.qty,
+          sousTotal: item.prix_unitaire * item.qty
+        });
+      }
+
+      const vente = await createVente(panier);
+
+      router.push({
+        pathname: "/(drawer)/(tabs)/ventes/success",
+        params: { id: vente.id, total: vente.total }
+      });
+    } catch (error: any) {
+      console.error("Sale confirmation error:", error);
+      setAlertConfig({
+        visible: true,
+        title: "Erreur de vente",
+        description: error.message || "Impossible d'enregistrer la vente.",
+      });
     }
   };
+
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.closeButton}
+        >
           <X size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>Nouvelle vente</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={() => router.push("/(drawer)/(tabs)/ventes/Scan_POS")}
+          style={styles.scanButton}
+        >
+          <ScanLine size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        {/* <View style={{ width: 40 }} /> */}
       </View>
-
+<ScrollView>
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Search size={18} color={Colors.textSecondary} />
@@ -90,16 +187,27 @@ export default function NewSaleScreen() {
           />
         </View>
       </View>
-
       <View style={styles.categoriesContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
-          {CATEGORIES.map(cat => (
-            <TouchableOpacity 
-              key={cat} 
-              style={[styles.categoryChip, activeCategory === cat && styles.categoryChipActive]}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScroll}
+        >
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.categoryChip,
+                activeCategory === cat && styles.categoryChipActive,
+              ]}
               onPress={() => setActiveCategory(cat)}
             >
-              <Text style={[styles.categoryText, activeCategory === cat && styles.categoryTextActive]}>
+              <Text
+                style={[
+                  styles.categoryText,
+                  activeCategory === cat && styles.categoryTextActive,
+                ]}
+              >
                 {cat}
               </Text>
             </TouchableOpacity>
@@ -109,25 +217,38 @@ export default function NewSaleScreen() {
 
       <FlatList
         data={filteredProducts}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         numColumns={2}
         contentContainerStyle={styles.productList}
         columnWrapperStyle={styles.productRow}
         renderItem={({ item }) => {
           const qty = cart[item.id] || 0;
           return (
-            <View style={[styles.productCard, qty > 0 && styles.productCardActive]}>
+            <View
+              style={[styles.productCard, qty > 0 && styles.productCardActive]}
+            >
               <View style={styles.productInfo}>
-                <Text style={styles.productName}>{item.name}</Text>
-                <Text style={styles.productStock}>Stock disponible: {item.stock} u</Text>
+                <Text style={styles.productName}>{item.nom}</Text>
+                <Text style={styles.productStock}>
+                  Stock disponible: {item.stock_actuel} {item.unite || 'u'}
+                </Text>
               </View>
-              
+
               <View style={styles.stepper}>
-                <TouchableOpacity onPress={() => updateCart(item.id, -1)} style={styles.stepperBtn}>
-                  <Minus size={16} color={qty > 0 ? Colors.textPrimary : Colors.borderStrong} />
+                <TouchableOpacity
+                  onPress={() => updateCart(item.id, -1)}
+                  style={styles.stepperBtn}
+                >
+                  <Minus
+                    size={16}
+                    color={qty > 0 ? Colors.textPrimary : Colors.borderStrong}
+                  />
                 </TouchableOpacity>
                 <Text style={styles.qtyText}>{qty}</Text>
-                <TouchableOpacity onPress={() => updateCart(item.id, 1)} style={styles.stepperBtn}>
+                <TouchableOpacity
+                  onPress={() => updateCart(item.id, 1)}
+                  style={styles.stepperBtn}
+                >
                   <Plus size={16} color={Colors.textPrimary} />
                 </TouchableOpacity>
               </View>
@@ -135,6 +256,9 @@ export default function NewSaleScreen() {
           );
         }}
       />
+</ScrollView>
+
+
 
       {cartItemsCount > 0 && (
         <View style={styles.summaryPanel}>
@@ -142,32 +266,57 @@ export default function NewSaleScreen() {
           <View style={styles.summaryHeader}>
             <View style={styles.summaryTitleRow}>
               <ShoppingCart size={18} color={Colors.textPrimary} />
-              <Text style={styles.summaryTitle}>{cartItemsCount} produits sélectionnés</Text>
+              <Text style={styles.summaryTitle}>
+                {cartItemsCount} produits sélectionnés
+              </Text>
             </View>
           </View>
-          
+
           <ScrollView style={[styles.cartList, { maxHeight: 150 }]}>
-            {selectedProducts.map(item => (
+            {selectedProducts.map((item) => (
               <View key={item.id} style={styles.cartItem}>
-                <Text style={styles.cartItemName}>{item.name} x{item.qty}</Text>
-                <Text style={styles.cartItemPrice}>{(item.price * item.qty).toLocaleString()} FCFA</Text>
+                <Text style={styles.cartItemName}>
+                  {item.nom} x{item.qty}
+                </Text>
+                <Text style={styles.cartItemPrice}>
+                  {(item.prix_unitaire * item.qty).toLocaleString()} FCFA
+                </Text>
               </View>
             ))}
           </ScrollView>
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{cartTotal.toLocaleString()} FCFA</Text>
+            <Text style={styles.totalValue}>
+              {cartTotal.toLocaleString()} FCFA
+            </Text>
+          </View>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setCart({})}>
+              <Text style={styles.cancelBtnText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
+              <Text style={styles.confirmBtnText}>Confirmer</Text>
+              <ArrowRight size={20} color={Colors.textInverse} />
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
-            <Text style={styles.confirmBtnText}>Confirmer la vente</Text>
-            <ArrowRight size={20} color={Colors.textInverse} />
-          </TouchableOpacity>
-          
-          <Text style={styles.footerNote}>LE STOCK SERA MIS À JOUR AUTOMATIQUEMENT</Text>
+          <Text style={styles.footerNote}>
+            LE STOCK SERA MIS À JOUR AUTOMATIQUEMENT
+          </Text>
         </View>
       )}
+
+      <CustomAlert
+        isVisible={alertConfig.visible}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        iconName="AlertTriangle"
+        color={Colors.danger}
+        primaryButtonLabel="Compris"
+        onPrimaryPress={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
@@ -175,16 +324,20 @@ export default function NewSaleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
+    paddingTop: 30,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
   closeButton: {
+    padding: 8,
+  },
+  scanButton: {
     padding: 8,
   },
   title: {
@@ -197,9 +350,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
     paddingHorizontal: 15,
     height: 48,
@@ -221,13 +374,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     marginRight: 10,
     minWidth: 80,
-    alignItems: 'center',
+    alignItems: "center",
   },
   categoryChipActive: {
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
   categoryText: {
     fontFamily: FontFamily.bold,
@@ -235,27 +388,27 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   categoryTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   productList: {
     paddingHorizontal: 15,
     paddingBottom: 250, // Space for summary panel
   },
   productRow: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   productCard: {
-    width: '48%',
-    backgroundColor: '#FAFAFA',
+    width: "48%",
+    backgroundColor: "#FAFAFA",
     borderRadius: 16,
     padding: 12,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: "transparent",
   },
   productCardActive: {
-    borderColor: '#000',
-    backgroundColor: '#fff',
+    borderColor: "#000",
+    backgroundColor: "#fff",
   },
   productInfo: {
     marginBottom: 15,
@@ -273,20 +426,20 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
     borderRadius: 8,
     padding: 4,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: "#F0F0F0",
   },
   stepperBtn: {
     width: 30,
     height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   qtyText: {
     fontFamily: FontFamily.bold,
@@ -294,15 +447,15 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   summaryPanel: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
-    width: '100%',
-    backgroundColor: '#fff',
+    width: "100%",
+    backgroundColor: "#fff",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 25,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    paddingBottom: Platform.OS === "ios" ? 40 : 25,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -318,17 +471,17 @@ const styles = StyleSheet.create({
   handle: {
     width: 40,
     height: 5,
-    backgroundColor: '#EAEAEA',
+    backgroundColor: "#EAEAEA",
     borderRadius: 3,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 15,
   },
   summaryHeader: {
     marginBottom: 15,
   },
   summaryTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   summaryTitle: {
     fontFamily: FontFamily.bold,
@@ -340,8 +493,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   cartItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   cartItemName: {
@@ -355,12 +508,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 15,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: "#F0F0F0",
     marginBottom: 20,
   },
   totalLabel: {
@@ -373,26 +526,45 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: Colors.textPrimary,
   },
-  confirmBtn: {
-    backgroundColor: '#000',
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  cancelBtn: {
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
     height: 56,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
+    flex: 1,
+    marginRight: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  confirmBtn: {
+    backgroundColor: "#000",
+    borderRadius: 12,
+    height: 56,
+    flex: 2,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   confirmBtnText: {
     fontFamily: FontFamily.bold,
     fontSize: 16,
-    color: '#fff',
+    color: "#fff",
     marginRight: 10,
   },
   footerNote: {
     fontFamily: FontFamily.bold,
     fontSize: 9,
     color: Colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     letterSpacing: 0.5,
   },
 });

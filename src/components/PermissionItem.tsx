@@ -2,16 +2,20 @@
 // LOTUS BUSINESS — Composant : PermissionItem
 // ============================================
 
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { LucideIcon } from 'lucide-react-native'
 
 export type PermissionType = 'required' | 'optional'
+export type PermissionStatus = 'pending' | 'granted' | 'denied' | 'coming_soon'
 
 interface PermissionItemProps {
   icon: LucideIcon
   title: string
   subtitle: string
   type: PermissionType
+  status?: PermissionStatus
+  color?: string
+  onPress?: () => void
 }
 
 export default function PermissionItem({
@@ -19,14 +23,23 @@ export default function PermissionItem({
   title,
   subtitle,
   type,
+  status = 'pending',
+  color = '#0A0A0A',
+  onPress,
 }: PermissionItemProps) {
   const isRequired = type === 'required'
+  const isGranted = status === 'granted'
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity 
+      style={[styles.container, isGranted && styles.containerGranted]} 
+      onPress={onPress}
+      activeOpacity={0.7}
+      disabled={isGranted || status === 'coming_soon'}
+    >
       {/* Icône */}
-      <View style={styles.iconBox}>
-        <Icon size={18} color="#0A0A0A" />
+      <View style={[styles.iconBox, isGranted && styles.iconBoxGranted]}>
+        <Icon size={18} color={isGranted ? '#FFFFFF' : color} />
       </View>
 
       {/* Texte */}
@@ -36,12 +49,22 @@ export default function PermissionItem({
       </View>
 
       {/* Badge */}
-      <View style={[styles.badge, isRequired ? styles.badgeRequired : styles.badgeOptional]}>
-        <Text style={[styles.badgeText, isRequired ? styles.badgeTextRequired : styles.badgeTextOptional]}>
-          {isRequired ? 'REQUIS' : 'OPTIONNEL'}
+      <View style={[
+        styles.badge, 
+        isGranted ? styles.badgeGranted 
+        : isRequired ? styles.badgeRequired 
+        : styles.badgeOptional
+      ]}>
+        <Text style={[
+          styles.badgeText, 
+          isGranted ? styles.badgeTextGranted 
+          : isRequired ? styles.badgeTextRequired 
+          : styles.badgeTextOptional
+        ]}>
+          {isGranted ? 'ACTIVÉ' : status === 'coming_soon' ? 'À VENIR' : isRequired ? 'REQUIS' : 'OPTIONNEL'}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   )
 }
 
@@ -55,6 +78,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
   },
+  containerGranted: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#C8E6C9',
+    borderWidth: 1,
+  },
   iconBox: {
     width: 38,
     height: 38,
@@ -65,8 +93,9 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: '#E0E0E0',
   },
-  icon: {
-    fontSize: 18,
+  iconBoxGranted: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
   },
   textBlock: {
     flex: 1,
@@ -97,6 +126,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1D1D1',
   },
+  badgeGranted: {
+    backgroundColor: '#4CAF50',
+  },
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
@@ -107,5 +139,8 @@ const styles = StyleSheet.create({
   },
   badgeTextOptional: {
     color: '#6B6B6B',
+  },
+  badgeTextGranted: {
+    color: '#FFFFFF',
   },
 })

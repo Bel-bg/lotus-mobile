@@ -1,55 +1,92 @@
 {
   "expo": {
-    "name": "lotus",
+    "name": "Lotus Business",
     "slug": "lotus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/lotus.png",
     "scheme": "lotus",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "android": {
       "package": "com.litxx.lotusbusiness",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/logo.png",
-        "backgroundImage": "./assets/images/logo.png",
-        "monochromeImage": "./assets/images/logo.png"
+        "foregroundImage": "./assets/lotus.png",
+        "backgroundColor": "#FFFFFF"
       },
-      "predictiveBackGestureEnabled": false
+      "googleServicesFile": "./google-services.json",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.CAMERA"
+      ]
+
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/logo.png"
+    "ios": {
+      "bundleIdentifier": "com.litxx.lotusbusiness",
+      "infoPlist": {
+        "UIStatusBarStyle": "UIStatusBarStyleDarkContent",
+        "NSCameraUsageDescription": "Utilisé pour scanner les codes-barres des produits.",
+        "NSPhotoLibraryUsageDescription": "Utilisé pour ajouter des photos aux produits.",
+        "NSBluetoothAlwaysUsageDescription": "Utilisé pour connecter l'imprimante Bluetooth.",
+        "NSBluetoothPeripheralUsageDescription": "Utilisé pour connecter l'imprimante Bluetooth.",
+        "NSLocationWhenInUseUsageDescription": "Requis pour la découverte des périphériques Bluetooth."
+      }
     },
     "plugins": [
       "expo-router",
+      "expo-sqlite",
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "visibility": "hidden"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo.png",
+          "color": "#0A0A0A",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "Lotus Business"
+        }
+      ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFFFFF",
           "android": {
-            "image": "./assets/images/logo.png",
-            "imageWidth": 76
+            "image": "./assets/lotus.png",
+            "imageWidth": 50,
+            "adaptiveIcon": {
+              "foregroundImage": "./assets/lotus.png",
+              "backgroundColor": "#FFFFFF"
+            }
           }
         }
       ],
-      "expo-sqlite",
-      "expo-web-browser"
+      "@react-native-google-signin/google-signin",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "androidStatusBar": {
-      "backgroundColor": "#FFFFFF",
-      "barStyle": "dark-content",
-      "translucent": false
-    },
-    "ios": {
-      "infoPlist": {
-        "UIStatusBarStyle": "UIStatusBarStyleDarkContent"
-      },
-      "bundleIdentifier": "com.litxx.lotusbusiness"
     },
     "extra": {
       "router": {},

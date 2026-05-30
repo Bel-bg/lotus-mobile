@@ -20,10 +20,17 @@ export interface Boutique {
   id?: string
   nom: string
   proprietaire?: string
+  gerant?: string
   telephone?: string
+  whatsapp?: string
   devise: string
   deviseSymbole?: string
   pays?: string
+  ville?: string
+  bp?: string
+  ifu?: string
+  politiqueVentes?: string
+  specialiteBoutique?: string
   indicatifTel?: string
   email?: string
   photoUri?: string

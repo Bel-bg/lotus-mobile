@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, SafeAreaView, Switch } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Save } from 'lucide-react-native';
+import { ArrowLeft, Save, Plus, ChevronDown } from 'lucide-react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import { initDB } from '@/lib/db/schema';
+import CustomAlert from '../../../../components/customs/Alert';
+import AddCategoryModal from '../../../../components/inventaire/AddCategoryModal';
+import Selector, { SelectorOption } from '../../../../components/customs/Selector';
+import { Colors } from '@/constants/colors';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useState } from 'react';
+import React from 'react';
+
+// Generators
+const generateId = () => Math.random().toString(36).substring(2, 15);
+const generateReference = () => 'REF' + Math.floor(100000 + Math.random() * 900000);
 
 const colors = {
   background: '#FAFAFA',
@@ -17,23 +27,93 @@ const colors = {
 export default function NewProductScreen() {
   const router = useRouter();
 
-  // Mode state
-  const [vendPiece, setVendPiece] = useState(true);
-  const [vendCarton, setVendCarton] = useState(false);
-
   // Form state
   const [nom, setNom] = useState('');
-  const [categorie, setCategorie] = useState('Général');
-  const [prixPiece, setPrixPiece] = useState('');
-  const [prixCarton, setPrixCarton] = useState('');
-  const [unitesParCarton, setUnitesParCarton] = useState('');
-  const [stockActuel, setStockActuel] = useState('');
-  const [stockMin, setStockMin] = useState('10');
+  const [categorie, setCategorie] = useState('Autres');
+  const [categories, setCategories] = useState<SelectorOption[]>([]);
+  const [prix, setPrix] = useState('');
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isSelectorVisible, setIsSelectorVisible] = useState(false);
 
-  const handleSave = () => {
-    // Ici on devrait interagir avec le usStore / SQLite
-    console.log("Saving product: ", { nom, vendPiece, vendCarton });
-    router.back();
+  const fetchCategories = React.useCallback(async () => {
+    try {
+      const db = await initDB();
+      const rows = await db.getAllAsync<{nom: string}>("SELECT nom FROM categories ORDER BY nom ASC");
+      setCategories(rows.map(r => ({ label: r.nom, value: r.nom })));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchCategories();
+    }, [fetchCategories])
+  );
+
+  // Alert state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    description: string;
+    icon: 'AlertTriangle' | 'CheckCircle';
+    color: string;
+  }>({ visible: false, title: '', description: '', icon: 'AlertTriangle', color: colors.danger });
+
+  const handleSave = async () => {
+    if (!nom.trim() || !prix.trim()) {
+      setAlertConfig({
+        visible: true,
+        title: "Champs requis",
+        description: "Veuillez remplir le nom et le prix du produit.",
+        icon: 'AlertTriangle',
+        color: colors.danger
+      });
+      return;
+    }
+
+    try {
+      const db = await initDB();
+      
+      // Check if product already exists
+      const existing = await db.getFirstAsync<{ id: string }>(
+        "SELECT id FROM produits WHERE nom = ?",
+        [nom.trim()]
+      );
+
+      if (existing) {
+        setAlertConfig({
+          visible: true,
+          title: "Produit existant",
+          description: `Un produit nommé "${nom}" existe déjà dans votre inventaire.`,
+          icon: 'AlertTriangle',
+          color: colors.danger
+        });
+        return;
+      }
+
+      // Insert new product with automatic reference
+      await db.runAsync(
+        `INSERT INTO produits (
+          id, nom, categorie, prix_unitaire, barcode, 
+          type_vente, stock_actuel, stock_min
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          generateId(),
+          nom.trim(),
+          categorie || 'Autres',
+          parseFloat(prix) || 0,
+          generateReference(),
+          'piece',
+          0, // Initial stock 0 by default
+          10 // Default alert threshold
+        ]
+      );
+
+      router.back();
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement:", error);
+    }
   };
 
   return (
@@ -49,9 +129,10 @@ export default function NewProductScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
         
-        {/* Section Infos générales */}
+        {/* Section Infos principales */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Informations générales</Text>
+          <Text style={styles.sectionTitle}>Identification du produit</Text>
+          <Text style={styles.sectionSubtitle}>Saisissez les informations de base</Text>
           
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nom du produit <Text style={{color: colors.danger}}>*</Text></Text>
@@ -65,118 +146,38 @@ export default function NewProductScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Catégorie</Text>
+            <TouchableOpacity 
+              style={styles.selectorTrigger} 
+              onPress={() => setIsSelectorVisible(true)}
+            >
+              <Text style={styles.selectorValue}>{categorie}</Text>
+              <ChevronDown size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.addCatLink} 
+              onPress={() => setIsModalVisible(true)}
+            >
+              <Plus size={14} color="#3B82F6" style={{marginRight: 4}} />
+              <Text style={styles.addCatLinkText}>Créer une nouvelle catégorie</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Section Prix */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tarification</Text>
+          <Text style={styles.sectionSubtitle}>Prix de vente final au client</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Prix Unitaire (FCFA) <Text style={{color: colors.danger}}>*</Text></Text>
             <TextInput 
               style={styles.input} 
-              placeholder="Ex: Boissons"
-              value={categorie}
-              onChangeText={setCategorie}
+              placeholder="Ex: 500"
+              keyboardType="numeric"
+              value={prix}
+              onChangeText={setPrix}
             />
-          </View>
-        </View>
-
-        {/* Section Conditionnement & Prix */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vente et Tarifs</Text>
-          <Text style={styles.sectionSubtitle}>Spécifiez comment ce produit est vendu</Text>
-
-          {/* Switch Vente par pièce */}
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.switchLabel}>Vente à l'unité (Pièce)</Text>
-              <Text style={styles.switchDesc}>Le produit peut être vendu individuellement.</Text>
-            </View>
-            <Switch 
-              value={vendPiece} 
-              onValueChange={setVendPiece}
-              trackColor={{ false: colors.border, true: colors.success }}
-            />
-          </View>
-          
-          {vendPiece && (
-            <View style={styles.priceContainer}>
-              <Text style={styles.label}>Prix par pièce (FCFA)</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="Ex: 500"
-                keyboardType="numeric"
-                value={prixPiece}
-                onChangeText={setPrixPiece}
-              />
-            </View>
-          )}
-
-          {/* Switch Vente par carton */}
-          <View style={[styles.switchRow, { marginTop: 20 }]}>
-            <View>
-              <Text style={styles.switchLabel}>Vente en gros (Carton / Pack)</Text>
-              <Text style={styles.switchDesc}>Le produit peut être vendu par lot complet.</Text>
-            </View>
-            <Switch 
-              value={vendCarton} 
-              onValueChange={setVendCarton}
-              trackColor={{ false: colors.border, true: colors.success }}
-            />
-          </View>
-
-          {vendCarton && (
-            <View style={styles.priceContainer}>
-              <View style={styles.row}>
-                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                  <Text style={styles.label}>Prix du carton</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    placeholder="Ex: 10000"
-                    keyboardType="numeric"
-                    value={prixCarton}
-                    onChangeText={setPrixCarton}
-                  />
-                </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Unités / Carton</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    placeholder="Ex: 24"
-                    keyboardType="numeric"
-                    value={unitesParCarton}
-                    onChangeText={setUnitesParCarton}
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Section Stock */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Gestion du stock</Text>
-
-          {vendCarton && !vendPiece ? (
-            <Text style={styles.infoText}>Le stock de ce produit sera comptabilisé en cartons complets.</Text>
-          ) : vendCarton && vendPiece ? (
-            <Text style={styles.infoText}>Pour faciliter la gestion, votre stock total sera comptabilisé en unités individuelles (pièces).</Text>
-          ) : null}
-
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.label}>Quantité initiale <Text style={{color: colors.danger}}>*</Text></Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="0"
-                keyboardType="numeric"
-                value={stockActuel}
-                onChangeText={setStockActuel}
-              />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Alerte seuil min</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="10"
-                keyboardType="numeric"
-                value={stockMin}
-                onChangeText={setStockMin}
-              />
-            </View>
           </View>
         </View>
 
@@ -189,6 +190,35 @@ export default function NewProductScreen() {
           <Text style={styles.saveButtonText}>Enregistrer le produit</Text>
         </TouchableOpacity>
       </View>
+
+      <CustomAlert
+        isVisible={alertConfig.visible}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        iconName={alertConfig.icon as any}
+        color={alertConfig.color}
+        primaryButtonLabel="Compris"
+        onPrimaryPress={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
+
+      <AddCategoryModal 
+        isVisible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onSuccess={(name) => {
+          fetchCategories();
+          setCategorie(name);
+        }}
+      />
+
+      <Selector 
+        visible={isSelectorVisible}
+        title="Choisir une catégorie"
+        options={categories}
+        selectedValue={categorie}
+        onClose={() => setIsSelectorVisible(false)}
+        onSelect={(opt) => setCategorie(opt.value)}
+      />
     </SafeAreaView>
   );
 }
@@ -256,38 +286,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
-  switchRow: {
+  selectorTrigger: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
   },
-  switchLabel: {
+  selectorValue: {
     fontSize: 15,
-    fontWeight: '600',
     color: colors.textPrimary,
+    fontWeight: '500',
   },
-  switchDesc: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-    maxWidth: 240,
-  },
-  priceContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  row: {
+  addCatLink: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingLeft: 4,
   },
-  infoText: {
-    fontSize: 12,
+  addCatLinkText: {
+    fontSize: 13,
     color: '#3B82F6',
-    backgroundColor: '#EFF6FF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    fontWeight: '600',
   },
   footer: {
     backgroundColor: colors.surface,

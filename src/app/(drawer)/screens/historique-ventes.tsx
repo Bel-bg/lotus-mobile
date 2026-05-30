@@ -229,41 +229,6 @@ export default function HistoriqueVentesScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.iconButton}
-            activeOpacity={0.75}
-          >
-            <ArrowLeft size={20} color={Colors.textPrimary} strokeWidth={2.4} />
-          </TouchableOpacity>
-
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle} selectable>
-              Historique ventes
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() =>
-              setActiveFilter((current) =>
-                current === "today"
-                  ? "week"
-                  : current === "week"
-                    ? "month"
-                    : "today",
-              )
-            }
-            style={styles.iconButton}
-            activeOpacity={0.75}
-          >
-            <SlidersHorizontal
-              size={19}
-              color={Colors.textPrimary}
-              strokeWidth={2.4}
-            />
-          </TouchableOpacity>
-        </View>
 
         <View style={styles.filterRow}>
           {FILTERS.map((filter) => {

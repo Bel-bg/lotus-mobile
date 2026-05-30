@@ -8,6 +8,8 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated'
+import { Colors } from '@/constants/colors'
+import { FontFamily, FontSize } from '@/constants/typography'
 
 interface PrimaryButtonProps {
   label: string
@@ -51,18 +53,18 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 52,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.black,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   disabled: {
-    backgroundColor: '#D1D1D1',
+    backgroundColor: Colors.borderStrong,
   },
   label: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    color: Colors.textInverse,
+    fontFamily: FontFamily.utilityBold,
+    fontSize: FontSize.lg,
     letterSpacing: 0.2,
   },
 })

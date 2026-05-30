@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Plus, Tags, Trash2 } from 'lucide-react-native';
-import { DUMMY_CATEGORIES, DUMMY_PRODUITS } from './dummyData';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { ArrowLeft, Plus, Tags, Trash2, AlertTriangle } from 'lucide-react-native';
+import { openDatabaseSync } from 'expo-sqlite';
+import CustomAlert from '../../../../components/customs/Alert';
+
+const generateId = () => Math.random().toString(36).substring(2, 15);
 
 const colors = {
   background: '#FAFAFA',
@@ -17,17 +20,89 @@ const colors = {
 export default function CategoriesScreen() {
   const router = useRouter();
   const [newCatName, setNewCatName] = useState('');
-  const [categories, setCategories] = useState([...DUMMY_CATEGORIES]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [productCounts, setProductCounts] = useState<Record<string, number>>({});
+  
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    description: string;
+  }>({ visible: false, title: '', description: '' });
 
-  const handleAddCat = () => {
-    if (newCatName.trim() && !categories.includes(newCatName.trim())) {
-      setCategories([...categories, newCatName.trim()]);
+  const fetchData = React.useCallback(async () => {
+    try {
+      const db = openDatabaseSync("lotus_business.db");
+      
+      // Fetch categories
+      const cats = await db.getAllAsync<any>("SELECT * FROM categories ORDER BY nom ASC");
+      setCategories(cats);
+
+      // Fetch product counts per category
+      const counts = await db.getAllAsync<{ categorie: string, count: number }>(
+        "SELECT categorie, COUNT(*) as count FROM produits GROUP BY categorie"
+      );
+      const countsMap: Record<string, number> = {};
+      counts.forEach(c => {
+        countsMap[c.categorie] = c.count;
+      });
+      setProductCounts(countsMap);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
+
+  const handleAddCat = async () => {
+    const trimmedName = newCatName.trim();
+    if (!trimmedName) return;
+
+    try {
+      const db = openDatabaseSync("lotus_business.db");
+      
+      // Check if exists
+      const existing = await db.getFirstAsync("SELECT id FROM categories WHERE nom = ?", [trimmedName]);
+      if (existing) {
+        setAlertConfig({
+          visible: true,
+          title: "Catégorie existante",
+          description: `La catégorie "${trimmedName}" figure déjà dans votre liste.`,
+        });
+        return;
+      }
+
+      await db.runAsync(
+        "INSERT INTO categories (id, nom) VALUES (?, ?)",
+        [generateId(), trimmedName]
+      );
       setNewCatName('');
+      fetchData();
+    } catch (error) {
+      console.error("Error adding category:", error);
     }
   };
 
-  const getProductCount = (catName: string) => {
-    return DUMMY_PRODUITS.filter(p => p.categorie === catName).length;
+  const handleDeleteCat = async (id: string, name: string) => {
+    if (productCounts[name] > 0) {
+      setAlertConfig({
+        visible: true,
+        title: "Action impossible",
+        description: `Vous ne pouvez pas supprimer cette catégorie car elle contient ${productCounts[name]} produit(s). Reclassez les produits d'abord.`,
+      });
+      return;
+    }
+
+    try {
+      const db = openDatabaseSync("lotus_business.db");
+      await db.runAsync("DELETE FROM categories WHERE id = ?", [id]);
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting category:", error);
+    }
   };
 
   return (
@@ -62,18 +137,21 @@ export default function CategoriesScreen() {
         {/* Liste des catégories */}
         <Text style={[styles.sectionTitle, { marginTop: 20, marginBottom: 12 }]}>Catégories existantes</Text>
         
-        {categories.map((cat, index) => (
-          <View key={index} style={styles.catItem}>
+        {categories.map((cat) => (
+          <View key={cat.id} style={styles.catItem}>
             <View style={styles.catInfo}>
               <View style={styles.iconBox}>
                 <Tags size={18} color={colors.textSecondary} />
               </View>
               <View>
-                <Text style={styles.catName}>{cat}</Text>
-                <Text style={styles.catCount}>{getProductCount(cat)} produit(s)</Text>
+                <Text style={styles.catName}>{cat.nom}</Text>
+                <Text style={styles.catCount}>{productCounts[cat.nom] || 0} produit(s)</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.deleteButton}>
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={() => handleDeleteCat(cat.id, cat.nom)}
+            >
               <Trash2 size={18} color={colors.danger} />
             </TouchableOpacity>
           </View>
@@ -81,6 +159,16 @@ export default function CategoriesScreen() {
 
       </ScrollView>
 
+      <CustomAlert
+        isVisible={alertConfig.visible}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        iconName="AlertTriangle"
+        color={colors.danger}
+        primaryButtonLabel="Compris"
+        onPrimaryPress={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 }

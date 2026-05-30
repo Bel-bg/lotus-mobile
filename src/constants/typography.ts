@@ -2,32 +2,32 @@
 // LOTUS BUSINESS — Design System : Typographie
 // ============================================
 
-// Font Families par défaut (DM Sans)
-const DMSans = {
-  regular: 'DMSans-Regular',
-  medium: 'DMSans-Medium',
-  bold: 'DMSans-Bold',
-  semiBold: 'DMSans-SemiBold',
+// Font Families par défaut (Outfit)
+const Outfit = {
+  regular: 'Outfit_400Regular',
+  medium: 'Outfit_500Medium',
+  bold: 'Outfit_700Bold',
+  semiBold: 'Outfit_600SemiBold',
 }
 
 // Zonage Typographique — À swapper si une police Display est ajoutée (ex: General Sans)
 export const FontFamily = {
   // Zone : Titans, Metrics, Headers (Géométrique/Premium)
-  display: DMSans.bold,
-  displaySemi: DMSans.semiBold,
+  display: Outfit.bold,
+  displaySemi: Outfit.semiBold,
   
   // Zone : Corps de texte, Descriptions (Lisibilité)
-  content: DMSans.regular,
+  content: Outfit.regular,
   
   // Zone : Contrôles, Labels, Boutons (Utilitaire)
-  utility: DMSans.medium,
-  utilityBold: DMSans.bold,
+  utility: Outfit.medium,
+  utilityBold: Outfit.bold,
 
   // Compatibilité ascendante (Legacy)
-  regular: DMSans.regular,
-  medium: DMSans.medium,
-  bold: DMSans.bold,
-  semiBold: DMSans.semiBold,
+  regular: Outfit.regular,
+  medium: Outfit.medium,
+  bold: Outfit.bold,
+  semiBold: Outfit.semiBold,
 } as const
 
 export const FontSize = {

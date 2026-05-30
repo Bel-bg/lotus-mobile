@@ -17,6 +17,37 @@ export async function initDB(): Promise<SQLite.SQLiteDatabase> {
 
   db = await SQLite.openDatabaseAsync(DB_NAME)
   await createTables(db)
+  
+  // Migration: ajouter colonne barcode si absente
+  try {
+    await db.execAsync(`ALTER TABLE produits ADD COLUMN barcode TEXT`)
+  } catch {
+    // Colonne déjà existante
+  }
+
+  // Migration: uniformiser catégories
+  try {
+    await db.execAsync(`UPDATE produits SET categorie = 'Autres' WHERE categorie IS NULL OR categorie = 'Général'`)
+  } catch {
+    // Échec silencieux si table absente
+  }
+  
+  // Migration: ajouter les nouvelles colonnes boutique
+  try {
+    await db.execAsync(`
+      ALTER TABLE boutique ADD COLUMN gerant TEXT DEFAULT '';
+      ALTER TABLE boutique ADD COLUMN pays TEXT DEFAULT '';
+      ALTER TABLE boutique ADD COLUMN ville TEXT DEFAULT '';
+      ALTER TABLE boutique ADD COLUMN bp TEXT DEFAULT '';
+      ALTER TABLE boutique ADD COLUMN whatsapp TEXT DEFAULT '';
+      ALTER TABLE boutique ADD COLUMN ifu TEXT DEFAULT '';
+      ALTER TABLE boutique ADD COLUMN politique_ventes TEXT DEFAULT 'Les produits vendus ne sont ni échangés ni repris';
+      ALTER TABLE boutique ADD COLUMN specialite_boutique TEXT DEFAULT '';
+    `)
+  } catch {
+    // Colonnes déjà existantes ou erreur silencieuse
+  }
+  
   return db
 }
 
@@ -40,7 +71,8 @@ async function createTables(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE TABLE IF NOT EXISTS produits (
       id TEXT PRIMARY KEY,
       nom TEXT NOT NULL,
-      categorie TEXT DEFAULT 'Général',
+      barcode TEXT,
+      categorie TEXT DEFAULT 'Autres',
       prix_unitaire REAL,
       prix_carton REAL,
       unites_par_carton INTEGER,
@@ -51,6 +83,13 @@ async function createTables(db: SQLite.SQLiteDatabase): Promise<void> {
       unite TEXT DEFAULT 'unités',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Catégories
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY,
+      nom TEXT UNIQUE NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
     -- Ventes
@@ -114,13 +153,22 @@ async function createTables(db: SQLite.SQLiteDatabase): Promise<void> {
       id INTEGER PRIMARY KEY DEFAULT 1,
       nom TEXT NOT NULL DEFAULT '',
       proprietaire TEXT DEFAULT '',
+      gerant TEXT DEFAULT '',
+      pays TEXT DEFAULT '',
+      ville TEXT DEFAULT '',
+      bp TEXT DEFAULT '',
       telephone TEXT DEFAULT '',
+      whatsapp TEXT DEFAULT '',
+      ifu TEXT DEFAULT '',
+      politique_ventes TEXT DEFAULT 'Les produits vendus ne sont ni échangés ni repris',
+      specialite_boutique TEXT DEFAULT '',
       devise TEXT DEFAULT 'FCFA',
       email TEXT DEFAULT '',
       photo_uri TEXT DEFAULT NULL
     );
 
     INSERT OR IGNORE INTO boutique (id) VALUES (1);
+    INSERT OR IGNORE INTO categories (id, nom) VALUES ('cat_autres', 'Autres');
   `)
 }
 
@@ -134,6 +182,7 @@ export async function resetDB(): Promise<void> {
     DROP TABLE IF EXISTS mouvements;
     DROP TABLE IF EXISTS ventes;
     DROP TABLE IF EXISTS produits;
+    DROP TABLE IF EXISTS categories;
     DROP TABLE IF EXISTS bilans;
     DROP TABLE IF EXISTS sequences;
     DROP TABLE IF EXISTS boutique;

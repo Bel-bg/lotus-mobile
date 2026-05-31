@@ -58,6 +58,42 @@ export async function getMouvementsRecents(limit = 100): Promise<Mouvement[]> {
 /**
  * Enregistre une entrée de stock manuelle
  */
+/**
+ * Enregistre une sortie de stock manuelle et met à jour le stock
+ */
+export async function enregistrerSortieStock(
+  produitId: string,
+  quantite: number,
+  note?: string
+): Promise<void> {
+  const db = getDB()
+  const now = getDateTimeISO()
+
+  const produit = await db.getFirstAsync<{ stock_actuel: number }>(
+    'SELECT stock_actuel FROM produits WHERE id = ?',
+    [produitId]
+  )
+
+  if (!produit || produit.stock_actuel < quantite) {
+    throw new Error('Stock insuffisant')
+  }
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO mouvements (id, produit_id, type, quantite, note, created_at)
+       VALUES (?, ?, 'sortie', ?, ?, ?)`,
+      [generateId(), produitId, quantite, note ?? null, now]
+    )
+
+    await db.runAsync(
+      `UPDATE produits
+       SET stock_actuel = MAX(0, stock_actuel - ?), updated_at = ?
+       WHERE id = ?`,
+      [quantite, now, produitId]
+    )
+  })
+}
+
 export async function enregistrerEntreeStock(
   produitId: string,
   quantite: number,

@@ -61,6 +61,12 @@ export default function TabsLayout() {
               title: 'MOUVEMENTS',
             }}
           />
+          <Tabs.Screen
+            name="produits"
+            options={{
+              href: null,
+            }}
+          />
         </Tabs>
       </Animated.View>
     </View>

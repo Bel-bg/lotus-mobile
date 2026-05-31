@@ -12,6 +12,7 @@ import {
   searchProduits,
   getProduitsByCategorie,
   enregistrerEntreeStock,
+  enregistrerSortieStock,
   countProduits,
 } from '../lib/db'
 import { getProduitEnAlerte } from '../lib/utils'
@@ -30,6 +31,7 @@ interface StockState {
   editProduit: (id: string, form: Partial<ProduitForm>) => Promise<void>
   removeProduit: (id: string) => Promise<void>
   entreeStock: (produitId: string, quantite: number, note?: string) => Promise<void>
+  sortieStock: (produitId: string, quantite: number, note?: string) => Promise<void>
   setSearchQuery: (query: string) => Promise<void>
   setCategorieActive: (categorie: string | null) => Promise<void>
   refreshAlertes: () => void
@@ -85,6 +87,11 @@ export const useStockStore = create<StockState>((set, get) => ({
 
   entreeStock: async (produitId, quantite, note) => {
     await enregistrerEntreeStock(produitId, quantite, note)
+    await get().loadProduits()
+  },
+
+  sortieStock: async (produitId, quantite, note) => {
+    await enregistrerSortieStock(produitId, quantite, note)
     await get().loadProduits()
   },
 

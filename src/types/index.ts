@@ -47,6 +47,7 @@ export interface Produit {
   id: string
   nom: string
   categorie: string
+  barcode?: string
   prixUnitaire: number | null
   prixCarton: number | null
   unitesParCarton: number | null

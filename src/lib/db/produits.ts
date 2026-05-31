@@ -188,6 +188,7 @@ function mapRowToProduit(row: any): Produit {
   return {
     id: row.id,
     nom: row.nom,
+    barcode: row.barcode ?? undefined,
     categorie: row.categorie,
     prixUnitaire: row.prix_unitaire,
     prixCarton: row.prix_carton,

@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler'
 import { Stack, useRouter } from "expo-router";
 import * as NavigationBar from "expo-navigation-bar";
 import { StatusBar } from 'expo-status-bar';
@@ -12,9 +13,6 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter()
-  const { isAuthenticated, isOnboardingComplete } = useAuthStore()
-  // useRef pour éviter les redirections multiples
-  const hasRedirected = useRef(false)
 
   const [loaded, error] = useFonts({
     Outfit_400Regular,
@@ -47,16 +45,6 @@ export default function RootLayout() {
 
     void hideNavigationBar()
   }, [])
-
-  // Garde de session : redirige vers l'accueil uniquement si connecté ET onboarding terminé
-  useEffect(() => {
-    if (hasRedirected.current) return
-
-    if (isAuthenticated && isOnboardingComplete) {
-      hasRedirected.current = true
-      router.replace('/(drawer)/(tabs)')
-    }
-  }, [isAuthenticated, isOnboardingComplete])
 
   if (!loaded && !error) {
     return null;

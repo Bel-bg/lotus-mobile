@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, Pressable } from 'react-native'
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from 'lucide-react-native'
@@ -9,6 +9,7 @@ import { getProduitById } from '@/lib/db/produits'
 import { useStockStore } from '@/store/useStockStore'
 import type { Produit, ProduitForm } from '@/types'
 import ProductForm from '@/features/produits/product-form'
+import Loader from '@/components/ui/loader'
 
 export default function ProduitEditScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>()
@@ -71,7 +72,9 @@ export default function ProduitEditScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={Colors.textPrimary} />
+        <View style={{ minHeight: 200, marginTop: 24 }}>
+          <Loader />
+        </View>
       ) : (
         <ProductForm
           initial={produit}

@@ -4,7 +4,7 @@ import Loader from "@/components/ui/loader";
 import { getMouvementsRecents } from "@/lib/db/mouvements";
 import { initDB } from "@/lib/db/schema";
 import { Mouvement } from "@/types";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
@@ -21,7 +21,7 @@ import MoveEmpty from "./_components/MoveEmpty";
 import getSectionDateLabel, { getDateKey } from "./_utils/dateHelpers";
 
 // Nombre de mouvements affichés en aperçu
-const PREVIEW_LIMIT = 5;
+const PREVIEW_LIMIT = 12;
 
 export default function MoveScreen() {
   const isFocused = useIsFocused();

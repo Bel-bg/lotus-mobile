@@ -19,9 +19,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../../store/useAuthStore'
 import { updateBoutique } from '../../lib/db/boutique'
+import { initDB } from '../../lib/db/schema'
 import { Colors } from '../../constants/colors'
 import { FontFamily } from '../../constants/typography'
 import { X, ChevronDown, ChevronUp, Check } from 'lucide-react-native'
+import CustomAlert from '../../components/customs/Alert'
+import { useLoadingStore } from '../../store/useLoadingStore'
 
 // ── Icônes images prédéfinies ──────────────────────────────────────────────
 const ICONS = {
@@ -114,6 +117,9 @@ export default function FormScreen() {
   const router = useRouter()
   const { top } = useSafeAreaInsets()
   const setBoutique = useAuthStore((s) => s.setBoutique)
+  const isLoading = useLoadingStore((state) => state.isLoading)
+  const showLoading = useLoadingStore((state) => state.showLoading)
+  const hideLoading = useLoadingStore((state) => state.hideLoading)
 
   const [nomBoutique,        setNomBoutique]        = useState('')
   const [specialiteBoutique, setSpecialiteBoutique] = useState('')
@@ -132,7 +138,7 @@ export default function FormScreen() {
   const [deviseOpen,         setDeviseOpen]         = useState(false)
   const [paysOpen,           setPaysOpen]           = useState(false)
   const [erreurs,            setErreurs]            = useState<Record<string, string>>({})
-  const [loading,            setLoading]            = useState(false)
+  const [alertMessage,       setAlertMessage]       = useState('')
 
   const handleSubmit = async () => {
     const errs: Record<string, string> = {}
@@ -147,9 +153,13 @@ export default function FormScreen() {
     if (!whatsapp.trim())           errs.whatsapp          = 'Requis'
     if (!ifu.trim())                errs.ifu               = 'Requis'
     if (!politiqueVentes.trim())    errs.politiqueVentes   = 'Requis'
-    if (Object.keys(errs).length) { setErreurs(errs); return }
+    if (Object.keys(errs).length) {
+      setErreurs(errs)
+      setAlertMessage('Veuillez remplir tous les champs obligatoires avant de continuer.')
+      return
+    }
     setErreurs({})
-    setLoading(true)
+    showLoading()
 
     const boutiqueData = {
       nom:                nomBoutique.trim(),
@@ -170,15 +180,17 @@ export default function FormScreen() {
     setBoutique(boutiqueData as any)
 
     try {
-      const { initDB } = require('../../lib/db/schema')
       await initDB()
       await updateBoutique(boutiqueData as any)
     } catch (e) {
       console.error('Erreur sauvegarde SQLite:', e)
+      setAlertMessage('Impossible de sauvegarder la configuration boutique. Réessayez.')
+      hideLoading()
+      return
     }
 
     await new Promise((r) => setTimeout(r, 300))
-    setLoading(false)
+    hideLoading()
     router.replace('/(auth)/ConfigReadyScreen')
   }
 
@@ -193,7 +205,7 @@ export default function FormScreen() {
       {/* Bouton Fermer */}
       <TouchableOpacity
         style={[styles.closeButton, { top: top + 10 }]}
-        onPress={() => router.replace('/(auth)/google-signin')}
+        onPress={() => router.replace('/(auth)/start-signin')}
         activeOpacity={0.7}
       >
         <X color={Colors.textPrimary} size={20} strokeWidth={2.2} />
@@ -505,13 +517,13 @@ export default function FormScreen() {
 
         {/* ── Bouton de validation ─────────────────── */}
         <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonLoading]}
+          style={[styles.submitButton, isLoading && styles.submitButtonLoading]}
           onPress={handleSubmit}
           activeOpacity={0.85}
-          disabled={loading}
+          disabled={isLoading}
         >
           <Text style={styles.submitButtonText}>
-            {loading ? 'Enregistrement...' : 'Confirmer et continuer'}
+            Confirmer et continuer
           </Text>
         </TouchableOpacity>
 
@@ -519,6 +531,16 @@ export default function FormScreen() {
           Vous pourrez modifier ces informations plus tard dans les paramètres.
         </Text>
       </ScrollView>
+      <CustomAlert
+        isVisible={Boolean(alertMessage)}
+        onClose={() => setAlertMessage('')}
+        title="Configuration incomplète"
+        description={alertMessage}
+        iconName="AlertTriangle"
+        color={Colors.danger}
+        primaryButtonLabel="Corriger"
+        onPrimaryPress={() => setAlertMessage('')}
+      />
     </KeyboardAvoidingView>
   )
 }

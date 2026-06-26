@@ -1,6 +1,6 @@
-import React from 'react'
-import { View, Text, StyleSheet, Pressable } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import React from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,227 +8,224 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  runOnJS,
   FadeInDown,
-} from 'react-native-reanimated'
-import { Plus, Pencil, Trash2 } from 'lucide-react-native'
-import { Colors } from '@/constants/colors'
-import { FontFamily } from '@/constants/typography'
-import type { Produit } from '@/types'
+} from "react-native-reanimated";
+import { Plus, Pencil, Trash2 } from "lucide-react-native";
+import { Colors } from "@/constants/colors";
+import { FontFamily } from "@/constants/typography";
+import type { Produit } from "@/types";
 import {
   getStockStatut,
   getStockLabel,
   getStockColor,
   getStockBgColor,
-} from '@/lib/utils/stock'
-import AnimatedStockBar from './animated-stock-bar'
-import { useAuthStore } from '@/store/useAuthStore'
+} from "@/lib/utils/stock";
+import AnimatedStockBar from "./animated-stock-bar";
+import { useAuthStore } from "@/store/useAuthStore";
 
-const SWIPE_ACTION_W = 72
-const SPRING = { damping: 18, stiffness: 180 }
+const SWIPE_DELETE_WIDTH = 96;
+const SWIPE_OPEN_THRESHOLD = 40;
+const SWIPE_DELETE_TRIGGER = 120;
+const SPRING = { damping: 20, stiffness: 220 };
 
 interface ProductCardProps {
-  produit: Produit
-  index: number
-  selectionMode?: boolean
-  selected?: boolean
-  onPress: () => void
-  onLongPress?: () => void
-  onToggleSelect?: () => void
-  onAddStock: () => void
-  onEdit: () => void
-  onDelete: () => void
+  produit: Produit;
+  index: number;
+  onPress: () => void;
+  onAddStock: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 function formatPrice(produit: Produit, devise: string) {
-  if (produit.typeVente === 'carton' && produit.prixCarton != null) {
-    return `${produit.prixCarton.toLocaleString('fr-FR')} ${devise} / carton`
+  const prix = produit.prixUnitaire ?? produit.prixCarton;
+  if (prix != null) {
+    return `${prix.toLocaleString("fr-FR")} ${devise}`;
   }
-  if (produit.prixUnitaire != null) {
-    return `${produit.prixUnitaire.toLocaleString('fr-FR')} ${devise}`
-  }
-  return '—'
+  return "—";
 }
 
 function RuptureBadge() {
-  const opacity = useSharedValue(1)
+  const opacity = useSharedValue(1);
   React.useEffect(() => {
     opacity.value = withRepeat(
       withSequence(
         withTiming(0.45, { duration: 1500 }),
-        withTiming(1, { duration: 1500 })
+        withTiming(1, { duration: 1500 }),
       ),
       -1,
-      false
-    )
-  }, [])
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+      false,
+    );
+  }, []);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
     <Animated.View style={[styles.statusBadge, styles.ruptureBadge, style]}>
       <Text style={[styles.statusText, { color: Colors.danger }]}>RUPTURE</Text>
     </Animated.View>
-  )
+  );
 }
 
 export default function ProductCard({
   produit,
   index,
-  selectionMode,
-  selected,
   onPress,
-  onLongPress,
-  onToggleSelect,
   onAddStock,
   onEdit,
   onDelete,
 }: ProductCardProps) {
-  const devise = useAuthStore((s) => s.boutique?.devise ?? 'FCFA')
-  const statut = getStockStatut(produit)
-  const translateX = useSharedValue(0)
+  const devise = useAuthStore((s) => s.boutique?.devise ?? "FCFA");
+  const statut = getStockStatut(produit);
+  const translateX = useSharedValue(0);
+  const dragStartX = useSharedValue(0);
+
+  const closeSwipe = () => {
+    translateX.value = withSpring(0, SPRING);
+  };
 
   const pan = Gesture.Pan()
-    .activeOffsetX([-15, 15])
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-12, 12])
+    .onBegin(() => {
+      dragStartX.value = translateX.value;
+    })
     .onUpdate((e) => {
-      if (selectionMode) return
-      translateX.value = Math.min(0, Math.max(e.translationX, -SWIPE_ACTION_W * 3))
+      const next = dragStartX.value + e.translationX;
+      translateX.value = Math.min(0, Math.max(next, -SWIPE_DELETE_WIDTH));
     })
     .onEnd(() => {
-      if (selectionMode) return
-      const open = translateX.value < -SWIPE_ACTION_W
-      translateX.value = withSpring(open ? -SWIPE_ACTION_W * 3 : 0, SPRING)
-    })
+      const x = translateX.value;
+      if (x <= -SWIPE_DELETE_TRIGGER) {
+        translateX.value = withSpring(0, SPRING);
+        runOnJS(onDelete)();
+        return;
+      }
+      if (x <= -SWIPE_OPEN_THRESHOLD) {
+        translateX.value = withSpring(-SWIPE_DELETE_WIDTH, SPRING);
+        return;
+      }
+      translateX.value = withSpring(0, SPRING);
+    });
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
-  }))
-
-  const closeSwipe = () => {
-    translateX.value = withSpring(0, SPRING)
-  }
-
-  const handleAction = (fn: () => void) => {
-    closeSwipe()
-    fn()
-  }
+  }));
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 40).springify()}>
       <View style={styles.swipeContainer}>
-        <View style={styles.actionsRow}>
-          <Pressable
-            style={[styles.actionBtn, styles.actionGreen]}
-            onPress={() => handleAction(onAddStock)}
-          >
-            <Plus size={20} color="#FFF" />
-            <Text style={styles.actionLabel}>Stock</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, styles.actionDark]}
-            onPress={() => handleAction(onEdit)}
-          >
-            <Pencil size={18} color="#FFF" />
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, styles.actionRed]}
-            onPress={() => handleAction(onDelete)}
-          >
-            <Trash2 size={18} color="#FFF" />
-          </Pressable>
-        </View>
-
+        <Pressable
+          style={styles.deleteAction}
+          onPress={() => {
+            closeSwipe();
+            onDelete();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Supprimer le produit"
+        >
+          <Trash2 size={22} color={Colors.textInverse} strokeWidth={2.5} />
+          <Text style={styles.deleteLabel}>Supprimer</Text>
+        </Pressable>
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.card, cardStyle]}>
-            <Pressable
-              onPress={selectionMode ? onToggleSelect : onPress}
-              onLongPress={onLongPress}
-              style={({ pressed }) => [
-                styles.cardInner,
-                pressed && { opacity: 0.92 },
-                selected && styles.cardSelected,
-              ]}
-            >
-              <View style={styles.topRow}>
-                <View style={styles.titleBlock}>
-                  <Text style={styles.name} numberOfLines={1}>{produit.nom}</Text>
-                  <View style={styles.catPill}>
-                    <Text style={styles.catText}>{produit.categorie}</Text>
-                  </View>
-                </View>
-                {statut === 'rupture' ? (
-                  <RuptureBadge />
-                ) : (
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: getStockBgColor(statut) },
-                    ]}
-                  >
-                    <Text style={[styles.statusText, { color: getStockColor(statut) }]}>
-                      {getStockLabel(statut).toUpperCase()}
+            <View style={styles.cardInner}>
+              <Pressable
+                onPress={onPress}
+                style={({ pressed }) => pressed && { opacity: 0.92 }}
+              >
+                <View style={styles.topRow}>
+                  <View style={styles.titleBlock}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {produit.nom}
                     </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={styles.catPill}>
+                        <Text style={styles.catText}>{produit.categorie}</Text>
+                      </View>
+                      <Text style={styles.price}>
+                        {formatPrice(produit, devise)}
+                      </Text>
+                    </View>
                   </View>
-                )}
+                  {statut === "rupture" ? (
+                    <RuptureBadge />
+                  ) : (
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: getStockBgColor(statut) },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: getStockColor(statut) },
+                        ]}
+                      >
+                        {getStockLabel(statut).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <AnimatedStockBar produit={produit} showLabels />
+              </Pressable>
+
+              <View style={styles.quickRow}>
+                <Pressable
+                  style={styles.quickBtn}
+                  onPress={onAddStock}
+                  hitSlop={8}
+                >
+                  <Plus size={14} color={Colors.success} strokeWidth={2.5} />
+                  <Text style={styles.quickBtnText}>Stock</Text>
+                </Pressable>
+                <Pressable style={styles.quickBtn} onPress={onEdit} hitSlop={8}>
+                  <Pencil size={14} color={Colors.textPrimary} />
+                  <Text style={styles.quickBtnText}>Modifier</Text>
+                </Pressable>
+                <Text style={styles.swipeHint}>← glisser pour supprimer</Text>
               </View>
-
-              <Text style={styles.price}>{formatPrice(produit, devise)}</Text>
-              {produit.typeVente === 'les_deux' && produit.prixCarton != null && (
-                <Text style={styles.priceSecondary}>
-                  Carton : {produit.prixCarton.toLocaleString('fr-FR')} {devise}
-                </Text>
-              )}
-
-              <AnimatedStockBar produit={produit} showLabels />
-            </Pressable>
+            </View>
           </Animated.View>
         </GestureDetector>
       </View>
     </Animated.View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   swipeContainer: {
-    marginBottom: 12,
-    marginHorizontal: 20,
-    position: 'relative',
+    marginBottom: 0,
+    marginHorizontal: 0,
+    overflow: "hidden",
   },
-  actionsRow: {
-    position: 'absolute',
+  deleteAction: {
+    position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'stretch',
+    width: SWIPE_DELETE_WIDTH,
+    backgroundColor: Colors.danger,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  actionBtn: {
-    width: SWIPE_ACTION_W,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  actionGreen: { backgroundColor: Colors.success },
-  actionDark: { backgroundColor: Colors.textPrimary },
-  actionRed: { backgroundColor: Colors.danger },
-  actionLabel: {
+  deleteLabel: {
     fontFamily: FontFamily.utilityBold,
-    fontSize: 9,
-    color: '#FFF',
+    fontSize: 11,
+    color: Colors.textInverse,
+    textAlign: "center",
   },
   card: {
     backgroundColor: Colors.background,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   cardInner: { padding: 16 },
-  cardSelected: {
-    borderColor: Colors.textPrimary,
-    borderWidth: 2,
-  },
   topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
   },
   titleBlock: { flex: 1, marginRight: 8 },
@@ -239,11 +236,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   catPill: {
-    alignSelf: 'flex-start',
+    borderRadius: 0, // pill → tag rectangulaire
+    alignSelf: "flex-start",
     backgroundColor: Colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   catText: {
     fontFamily: FontFamily.content,
@@ -274,4 +271,34 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 8,
   },
-})
+  quickRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: 12,
+  },
+  quickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.surface,
+  },
+  quickBtnText: {
+    fontFamily: FontFamily.utilityBold,
+    fontSize: 11,
+    color: Colors.textPrimary,
+  },
+  swipeHint: {
+    flex: 1,
+    fontFamily: FontFamily.content,
+    fontSize: 10,
+    color: Colors.textTertiary,
+    textAlign: "right",
+  },
+});

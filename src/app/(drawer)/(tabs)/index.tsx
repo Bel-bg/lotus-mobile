@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   Platform,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -16,24 +17,47 @@ import { Colors } from "@/constants/colors";
 import { FontFamily } from "@/constants/typography";
 import { useStockStore } from "@/store/useStockStore";
 import CatalogPreview from "@/features/produits/catalog-preview";
+import HomeFab from "@/components/customs/HomeFab";
+import AdsOverlay from "@/app/(drawer)/ads/adsOverlays";
+import AdsImage from "@/assets/ads/ad4.png";
+import BannerAdsWithProgress from "../ads/bannerAds";
+import {
+  bannerImages,
+  bannerImagesRemote,
+  bannerImagesMix,
+} from "../ads/bannerData";
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const loadProduits = useStockStore((state) => state.loadProduits);
   const produits = useStockStore((state) => state.produits);
+  const [showAds, setShowAds] = useState(true);
+  const [isAdsCompleted, setIsAdsCompleted] = useState(false);
+  const handleBannerPress = () => {
+    console.log("Banner pressé !");
+  };
 
+  const handleAdsFinish = () => {
+    setIsAdsCompleted(true);
+    setShowAds(false);
+    console.log(" Pub terminée !");
+  };
+
+  const handleRedirect = () => {
+    console.log(" Redirection vers la page premium !");
+    router.push("/premium");
+  };
   useFocusEffect(
     useCallback(() => {
       loadProduits();
-    }, [loadProduits])
+    }, [loadProduits]),
   );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <CustomTopBar type="home" />
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -46,7 +70,9 @@ export default function HomeScreen() {
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.scanBtn}
-            onPress={() => router.push("/(drawer)/screens/inventaire/POScan/new")}
+            onPress={() =>
+              router.push("/(drawer)/screens/inventaire/POScan/new")
+            }
             activeOpacity={0.8}
           >
             <ScanLine size={22} color={Colors.textPrimary} />
@@ -58,28 +84,47 @@ export default function HomeScreen() {
             activeOpacity={0.8}
           >
             <Plus size={20} color="#FFF" />
-            <Text style={styles.addBtnText}>Nouveau produit</Text>
+            <Text style={styles.addBtnText}>Ajouter</Text>
           </TouchableOpacity>
         </View>
 
         {produits.length === 0 ? (
           <View style={styles.emptyHint}>
+            <Image
+              source={require("@/assets/images/empty.png")}
+              style={styles.emptyImage}
+            />
             <Text style={styles.emptyTitle}>Votre catalogue est vide</Text>
             <Text style={styles.emptySubtitle}>
               Ajoutez vos premiers produits pour suivre le stock et les ventes.
             </Text>
-            <TouchableOpacity
-              style={styles.primaryAddBtn}
-              onPress={() => router.push("/(drawer)/(tabs)/produits/edit")}
-            >
-              <Plus size={18} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={styles.primaryAddBtnText}>Ajouter un produit</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <CatalogPreview />
         )}
+
+        <BannerAdsWithProgress
+          banners={bannerImages}
+          redirectPath="/promotions"
+          autoPlay={true}
+          interval={2000}
+          height={120}
+          borderRadius={12}
+          onBannerPress={handleBannerPress}
+        />
       </ScrollView>
+
+      <View style={{ flex: 1, top: -150 }}>
+        <HomeFab />
+      </View>
+      {showAds && (
+        <AdsOverlay
+          onFinish={handleAdsFinish}
+          imageSource={AdsImage}
+          redirectPath="/premium"
+          onRedirect={handleRedirect}
+        />
+      )}
     </View>
   );
 }
@@ -150,12 +195,15 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     marginHorizontal: 20,
-    marginTop: 24,
+    marginTop: 100,
     padding: 24,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
     alignItems: "center",
+  },
+  emptyImage: {
+    width: 150,
+    height: 150,
+    marginBottom: 20,
   },
   emptyTitle: {
     fontFamily: FontFamily.display,

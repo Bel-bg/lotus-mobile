@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { CanalMessageWithReactions } from "../types/canal.types";
+import { CanalMessageWithReactions } from "../../../../../../features/news/types/canal.types";
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
 import { Radius, Shadow, Spacing } from "@/constants/layout";
@@ -94,7 +94,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderRadius: Radius.lg,
     overflow: "hidden",
-    ...Shadow.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   body: {
     paddingHorizontal: Spacing[4],

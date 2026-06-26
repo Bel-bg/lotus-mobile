@@ -43,7 +43,7 @@ export default function MoveHeader({
   return (
     <View style={styles.headerContent}>
       {/* Bannières de synthèse */}
-      <View style={styles.summaryRow}>
+      {/* <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, styles.summarySuccessCard]}>
           <Text style={[styles.summaryLabel, styles.summarySuccessLabel]}>
             ENTREES
@@ -63,7 +63,7 @@ export default function MoveHeader({
           </Text>
           <Text style={styles.summaryHint}>unités ce jour</Text>
         </View>
-      </View>
+      </View> */}
 
       {/* Recherche */}
       <View style={styles.searchBox}>

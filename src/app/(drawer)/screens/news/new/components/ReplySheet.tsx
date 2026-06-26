@@ -14,7 +14,7 @@ import { Send, X } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
 import { Radius, Spacing } from "@/constants/layout";
-import { CanalMessageWithReactions } from "../types/canal.types";
+import { CanalMessageWithReactions } from "../../../../../../features/news/types/canal.types";
 
 type Props = {
   visible: boolean;

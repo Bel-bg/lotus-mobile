@@ -4,37 +4,31 @@
 
 import * as SQLite from 'expo-sqlite'
 
-const DB_NAME = 'lotus_business.db'
-const DB_VERSION = 1
+export const DB_NAME = 'lotus_business.db'
+
+/**
+ * Version courante du schéma.
+ * Incrémenter à chaque ajout de migration dans MIGRATIONS[].
+ */
+const SCHEMA_VERSION = 6
 
 let db: SQLite.SQLiteDatabase | null = null
 
-/**
- * Ouvre et initialise la base de données
- */
-export async function initDB(): Promise<SQLite.SQLiteDatabase> {
-  if (db) return db
-
-  db = await SQLite.openDatabaseAsync(DB_NAME)
-  await createTables(db)
-  
-  // Migration: ajouter colonne barcode si absente
-  try {
-    await db.execAsync(`ALTER TABLE produits ADD COLUMN barcode TEXT`)
-  } catch {
-    // Colonne déjà existante
-  }
-
-  // Migration: uniformiser catégories
-  try {
-    await db.execAsync(`UPDATE produits SET categorie = 'Autres' WHERE categorie IS NULL OR categorie = 'Général'`)
-  } catch {
-    // Échec silencieux si table absente
-  }
-  
-  // Migration: ajouter les nouvelles colonnes boutique
-  try {
-    await db.execAsync(`
+// ─── Migrations séquentielles ────────────────────────────────────────────────
+// Chaque entrée correspond à une version : MIGRATIONS[0] = v1→v2, etc.
+// Ne jamais modifier une migration existante — toujours en ajouter une nouvelle.
+const MIGRATIONS: Array<{ version: number; sql: string }> = [
+  {
+    version: 1,
+    sql: `ALTER TABLE produits ADD COLUMN barcode TEXT`,
+  },
+  {
+    version: 2,
+    sql: `UPDATE produits SET categorie = 'Autres' WHERE categorie IS NULL OR categorie = 'Général'`,
+  },
+  {
+    version: 3,
+    sql: `
       ALTER TABLE boutique ADD COLUMN gerant TEXT DEFAULT '';
       ALTER TABLE boutique ADD COLUMN pays TEXT DEFAULT '';
       ALTER TABLE boutique ADD COLUMN ville TEXT DEFAULT '';
@@ -43,29 +37,107 @@ export async function initDB(): Promise<SQLite.SQLiteDatabase> {
       ALTER TABLE boutique ADD COLUMN ifu TEXT DEFAULT '';
       ALTER TABLE boutique ADD COLUMN politique_ventes TEXT DEFAULT 'Les produits vendus ne sont ni échangés ni repris';
       ALTER TABLE boutique ADD COLUMN specialite_boutique TEXT DEFAULT '';
-    `)
-  } catch {
-    // Colonnes déjà existantes ou erreur silencieuse
-  }
-  
+    `,
+  },
+  {
+    version: 4,
+    sql: `SELECT 1`, // no-op placeholder
+  },
+  {
+    // v5 : prix d'achat sur produits + tables clients et dettes
+    version: 5,
+    sql: `
+      ALTER TABLE produits ADD COLUMN prix_achat REAL DEFAULT NULL;
+
+      CREATE TABLE IF NOT EXISTS clients (
+        id          TEXT    PRIMARY KEY,
+        nom         TEXT    NOT NULL,
+        telephone   TEXT,
+        email       TEXT,
+        adresse     TEXT,
+        note        TEXT,
+        created_at  TEXT    DEFAULT (datetime('now')),
+        updated_at  TEXT    DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS dettes_clients (
+        id           TEXT    PRIMARY KEY,
+        client_id    TEXT    NOT NULL,
+        vente_id     TEXT,
+        montant_total  REAL  NOT NULL,
+        montant_paye   REAL  NOT NULL DEFAULT 0,
+        solde          REAL  GENERATED ALWAYS AS (montant_total - montant_paye) VIRTUAL,
+        statut       TEXT    NOT NULL DEFAULT 'en_cours'
+                              CHECK(statut IN ('en_cours', 'soldee', 'annulee')),
+        date_echeance TEXT,
+        note          TEXT,
+        created_at   TEXT    DEFAULT (datetime('now')),
+        updated_at   TEXT    DEFAULT (datetime('now')),
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (vente_id)  REFERENCES ventes(id)  ON DELETE SET NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS paiements_dette (
+        id          TEXT    PRIMARY KEY,
+        dette_id    TEXT    NOT NULL,
+        montant     REAL    NOT NULL,
+        note        TEXT,
+        created_at  TEXT    DEFAULT (datetime('now')),
+        FOREIGN KEY (dette_id) REFERENCES dettes_clients(id) ON DELETE CASCADE
+      );
+    `,
+  },
+  {
+    // v6 : configuration des seuils de niveaux de stock (singleton id=1)
+    version: 6,
+    sql: `
+      CREATE TABLE IF NOT EXISTS stock_config (
+        id            INTEGER PRIMARY KEY DEFAULT 1,
+        seuil_faible  INTEGER NOT NULL DEFAULT 10,
+        seuil_moyen   INTEGER NOT NULL DEFAULT 30,
+        updated_at    TEXT    DEFAULT (datetime('now'))
+      );
+      INSERT OR IGNORE INTO stock_config (id, seuil_faible, seuil_moyen) VALUES (1, 10, 30);
+    `,
+  },
+]
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Ouvre et initialise la base de données.
+ * Crée les tables puis exécute les migrations manquantes dans l'ordre.
+ */
+export async function initDB(): Promise<SQLite.SQLiteDatabase> {
+  if (db) return db
+
+  db = await SQLite.openDatabaseAsync(DB_NAME)
+  await createTables(db)
+  await runMigrations(db)
+
   return db
 }
 
 /**
- * Retourne l'instance DB (doit être initialisée avant)
+ * Retourne l'instance DB (doit être initialisée avant via initDB).
  */
 export function getDB(): SQLite.SQLiteDatabase {
-  if (!db) throw new Error('DB non initialisée. Appelle initDB() d\'abord.')
+  if (!db) throw new Error("DB non initialisée. Appelle initDB() d'abord.")
   return db
 }
 
-/**
- * Crée toutes les tables si elles n'existent pas
- */
-async function createTables(db: SQLite.SQLiteDatabase): Promise<void> {
-  await db.execAsync(`
+// ─── Création des tables ──────────────────────────────────────────────────────
+
+async function createTables(database: SQLite.SQLiteDatabase): Promise<void> {
+  await database.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
+
+    -- Table de versioning des migrations
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT OR IGNORE INTO schema_version (version) VALUES (0);
 
     -- Produits
     CREATE TABLE IF NOT EXISTS produits (
@@ -148,7 +220,7 @@ async function createTables(db: SQLite.SQLiteDatabase): Promise<void> {
 
     INSERT OR IGNORE INTO sequences (cle, valeur) VALUES ('facture', 0);
 
-    -- Boutique (config locale)
+    -- Boutique (config locale, singleton id=1)
     CREATE TABLE IF NOT EXISTS boutique (
       id INTEGER PRIMARY KEY DEFAULT 1,
       nom TEXT NOT NULL DEFAULT '',
@@ -167,13 +239,74 @@ async function createTables(db: SQLite.SQLiteDatabase): Promise<void> {
       photo_uri TEXT DEFAULT NULL
     );
 
+    -- Charges annexes
+    CREATE TABLE IF NOT EXISTS charges (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      label       TEXT    NOT NULL,
+      montant     REAL    NOT NULL,
+      categorie   TEXT    DEFAULT 'Autre',
+      note        TEXT,
+      date        TEXT    NOT NULL,
+      created_at  TEXT    DEFAULT (datetime('now'))
+    );
+
     INSERT OR IGNORE INTO boutique (id) VALUES (1);
     INSERT OR IGNORE INTO categories (id, nom) VALUES ('cat_autres', 'Autres');
+
+    -- Session authentifiée + licence backend (singleton id=1)
+    CREATE TABLE IF NOT EXISTS auth_session (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      token TEXT,
+      user_id TEXT,
+      email TEXT,
+      display_name TEXT,
+      phone TEXT,
+      license_key TEXT,
+      license_type TEXT,
+      license_status TEXT,
+      expiration_date TEXT,
+      user_json TEXT,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `)
 }
 
+// ─── Système de migrations ────────────────────────────────────────────────────
+
 /**
- * Réinitialise complètement la base (usage debug uniquement)
+ * Exécute les migrations manquantes dans l'ordre croissant.
+ * Chaque migration est atomique : en cas d'échec, elle est ignorée
+ * silencieusement (ex : colonne déjà existante avec SQLite).
+ */
+async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
+  const row = await database.getFirstAsync<{ version: number }>(
+    'SELECT version FROM schema_version LIMIT 1',
+  )
+  const currentVersion = row?.version ?? 0
+
+  if (currentVersion >= SCHEMA_VERSION) return
+
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= currentVersion) continue
+
+    try {
+      await database.execAsync(migration.sql)
+    } catch {
+      // Migration déjà appliquée (ex : ALTER TABLE sur colonne existante)
+      // → continuer vers la prochaine version
+    }
+
+    await database.runAsync(
+      'UPDATE schema_version SET version = ?',
+      migration.version,
+    )
+  }
+}
+
+// ─── Utilitaires ──────────────────────────────────────────────────────────────
+
+/**
+ * Réinitialise complètement la base (usage debug/développement uniquement).
  */
 export async function resetDB(): Promise<void> {
   if (!db) return
@@ -184,8 +317,31 @@ export async function resetDB(): Promise<void> {
     DROP TABLE IF EXISTS produits;
     DROP TABLE IF EXISTS categories;
     DROP TABLE IF EXISTS bilans;
+    DROP TABLE IF EXISTS charges;
     DROP TABLE IF EXISTS sequences;
     DROP TABLE IF EXISTS boutique;
+    DROP TABLE IF EXISTS auth_session;
+    DROP TABLE IF EXISTS schema_version;
   `)
   await createTables(db)
+  await runMigrations(db)
+}
+
+/**
+ * Supprime les données métier sans toucher à la configuration boutique
+ * ni à la session auth.
+ */
+export async function clearBusinessData(): Promise<void> {
+  const database = getDB()
+  await database.execAsync(`
+    DELETE FROM vente_items;
+    DELETE FROM mouvements;
+    DELETE FROM ventes;
+    DELETE FROM produits;
+    DELETE FROM categories;
+    DELETE FROM bilans;
+    DELETE FROM charges;
+    UPDATE sequences SET valeur = 0 WHERE cle = 'facture';
+    INSERT OR IGNORE INTO categories (id, nom) VALUES ('cat_autres', 'Autres');
+  `)
 }

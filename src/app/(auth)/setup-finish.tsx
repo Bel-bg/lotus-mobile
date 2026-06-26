@@ -4,12 +4,12 @@
 
 import { useRouter } from 'expo-router'
 import { Check } from 'lucide-react-native'
-import React from 'react'
+import React, { useRef } from 'react'
 import { Image, StatusBar, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import LottieView from 'lottie-react-native'
 import { Colors } from '../../constants/colors'
 import { FontFamily, TextStyles } from '../../constants/typography'
-import TopBar from '../../components/customs/TopBar'
 import PrimaryButton from '../../components/PrimaryButton'
 import { useAuthStore } from '../../store/useAuthStore'
 
@@ -17,53 +17,68 @@ export default function SetupFinishScreen() {
   const router = useRouter()
   const boutique = useAuthStore((state) => state.boutique)
   const boutiqueNom = boutique?.nom || 'Boutique Adjoua'
+  const lottieRef = useRef<LottieView>(null)
 
   const handleStart = () => {
     router.replace('/(drawer)/(tabs)')
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} >
+    <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <TopBar />
+      {/* Confetti — superposé par-dessus tout, non interactif */}
 
-      <ScrollView style={styles.container}  contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        
+      <View style={styles.lottieConfetti} pointerEvents="none">
+  <LottieView
+    ref={lottieRef}
+    source={require('@/assets/Lottie/coffeti.json')}
+    autoPlay
+    loop={false}
+    style={{ width: '100%', height: '100%' }}
+  />
+</View>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Zone centrale */}
         <View style={styles.centerBlock}>
           <View style={styles.checkMarkContainer}>
-            <Image source={require('@/assets/images/sucess.png')} style={styles.checkMark} resizeMode="contain" />
+            <Image
+              source={require('@/assets/images/sucess.png')}
+              style={styles.checkMark}
+              resizeMode="contain"
+            />
           </View>
 
           <Text style={styles.title}>Tout est prêt !</Text>
           <Text style={styles.subtitle}>
-            Votre boutique <Text style={styles.boldText}>'{boutiqueNom}'</Text> est configurée. 
+            Votre boutique <Text style={styles.boldText}>{boutiqueNom}</Text> est configurée.
             Vous pouvez maintenant commencer à gérer vos stocks et vos ventes.
           </Text>
 
           {/* Liste des fonctionnalités */}
           <View style={styles.featureList}>
-            <FeatureItem label="GESTION D'INVENTAIRE ACTIVÉE" />
-            <FeatureItem label="RAPPORTS JOURNALIERS AUTOMATISÉS" />
-            <FeatureItem label="SAUVEGARDE GOOGLE DRIVE CONNECTÉE" />
+            <FeatureItem label="Ventes simple & rapide" />
+            <FeatureItem label="Statistique en tant réel" />
           </View>
         </View>
 
         {/* Bouton d'action et Aide */}
         <View style={styles.footer}>
-          <PrimaryButton 
-            label="Commencer à utiliser Lotus Business" 
-            onPress={handleStart} 
+          <PrimaryButton
+            label="Commencer à utiliser Lotus Business"
+            onPress={handleStart}
           />
-          
+
           <TouchableOpacity activeOpacity={0.7} style={styles.helpLink}>
             <Text style={styles.helpText}>
               Besoin d'aide ? <Text style={styles.underlineText}>Consultez notre guide rapide</Text>
             </Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   )
@@ -84,6 +99,16 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  lottieConfetti: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99,
+    width: '100%',
+    height: '100%',
   },
   container: {
     flex: 1,

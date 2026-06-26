@@ -7,7 +7,6 @@ import {
   ScrollView,
   Pressable,
   Switch,
-  ActivityIndicator,
 } from 'react-native'
 import Animated, {
   useSharedValue,
@@ -19,25 +18,13 @@ import { ChevronDown, Check } from 'lucide-react-native'
 import Selector, { SelectorOption } from '@/components/customs/Selector'
 import { Colors } from '@/constants/colors'
 import { FontFamily } from '@/constants/typography'
-import type { Produit, ProduitForm, TypeVente } from '@/types'
+import type { Produit, ProduitForm } from '@/types'
 import { initDB } from '@/lib/db/schema'
-
-const UNITES = ['pièce', 'kg', 'litre', 'boîte', 'sachet', 'unités']
-
-const TYPE_OPTIONS: { value: TypeVente; label: string }[] = [
-  { value: 'piece', label: 'Pièce' },
-  { value: 'carton', label: 'Carton' },
-  { value: 'les_deux', label: 'Les deux' },
-]
 
 export interface ProductFormValues {
   nom: string
   categorie: string
-  typeVente: TypeVente
-  prixUnitaire: string
-  prixCarton: string
-  unitesParCarton: string
-  unite: string
+  prix: string
   stockMin: string
   stockMax: string
   echangeable: boolean
@@ -48,24 +35,22 @@ export function produitToFormValues(p?: Produit | null): ProductFormValues {
     return {
       nom: '',
       categorie: 'Autres',
-      typeVente: 'piece',
-      prixUnitaire: '',
-      prixCarton: '',
-      unitesParCarton: '',
-      unite: 'pièce',
+      prix: '',
       stockMin: '10',
       stockMax: '',
       echangeable: false,
     }
   }
+  const prix =
+    p.prixUnitaire != null
+      ? String(p.prixUnitaire)
+      : p.prixCarton != null
+        ? String(p.prixCarton)
+        : ''
   return {
     nom: p.nom,
     categorie: p.categorie,
-    typeVente: p.typeVente,
-    prixUnitaire: p.prixUnitaire != null ? String(p.prixUnitaire) : '',
-    prixCarton: p.prixCarton != null ? String(p.prixCarton) : '',
-    unitesParCarton: p.unitesParCarton != null ? String(p.unitesParCarton) : '',
-    unite: p.unite || 'pièce',
+    prix,
     stockMin: String(p.stockMin),
     stockMax: p.stockMax != null ? String(p.stockMax) : '',
     echangeable: false,
@@ -76,15 +61,14 @@ export function formValuesToProduitForm(v: ProductFormValues, stockActuel: numbe
   return {
     nom: v.nom.trim(),
     categorie: v.categorie,
-    typeVente: v.typeVente,
-    prixUnitaire: v.typeVente !== 'carton' ? parseFloat(v.prixUnitaire) || null : null,
-    prixCarton: v.typeVente !== 'piece' ? parseFloat(v.prixCarton) || null : null,
-    unitesParCarton:
-      v.typeVente !== 'piece' ? parseInt(v.unitesParCarton, 10) || null : null,
+    typeVente: 'piece',
+    prixUnitaire: parseFloat(v.prix) || null,
+    prixCarton: null,
+    unitesParCarton: null,
     stockActuel,
     stockMin: parseInt(v.stockMin, 10) || 0,
     stockMax: v.stockMax.trim() ? parseInt(v.stockMax, 10) : undefined,
-    unite: v.unite,
+    unite: 'unités',
   }
 }
 
@@ -123,20 +107,6 @@ function Field({
   )
 }
 
-function ConditionalBlock({ visible, children }: { visible: boolean; children: React.ReactNode }) {
-  const progress = useSharedValue(visible ? 1 : 0)
-  useEffect(() => {
-    progress.value = withTiming(visible ? 1 : 0, { duration: 200 })
-  }, [visible])
-  const style = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    maxHeight: progress.value * 400,
-    overflow: 'hidden',
-  }))
-  if (!visible) return null
-  return <Animated.View style={style}>{children}</Animated.View>
-}
-
 interface ProductFormProps {
   initial?: Produit | null
   saving?: boolean
@@ -155,7 +125,6 @@ export default function ProductForm({
   const [shakeKey, setShakeKey] = useState<string | null>(null)
   const [categories, setCategories] = useState<SelectorOption[]>([])
   const [selectorOpen, setSelectorOpen] = useState(false)
-  const [uniteOpen, setUniteOpen] = useState(false)
 
   const fetchCategories = useCallback(async () => {
     const db = await initDB()
@@ -169,6 +138,10 @@ export default function ProductForm({
     fetchCategories()
   }, [fetchCategories])
 
+  useEffect(() => {
+    setValues(produitToFormValues(initial))
+  }, [initial?.id])
+
   const set = <K extends keyof ProductFormValues>(key: K, val: ProductFormValues[K]) => {
     setValues((v) => ({ ...v, [key]: val }))
     setErrors((e) => ({ ...e, [key]: undefined }))
@@ -177,13 +150,7 @@ export default function ProductForm({
   const validate = (): boolean => {
     const next: typeof errors = {}
     if (!values.nom.trim()) next.nom = 'Nom requis'
-    if (values.typeVente !== 'carton' && !values.prixUnitaire.trim()) {
-      next.prixUnitaire = 'Prix unitaire requis'
-    }
-    if (values.typeVente !== 'piece') {
-      if (!values.prixCarton.trim()) next.prixCarton = 'Prix carton requis'
-      if (!values.unitesParCarton.trim()) next.unitesParCarton = 'Unités/carton requis'
-    }
+    if (!values.prix.trim()) next.prix = 'Prix requis'
     if (!values.stockMin.trim()) next.stockMin = 'Seuil requis'
     setErrors(next)
     const firstKey = Object.keys(next)[0]
@@ -196,9 +163,6 @@ export default function ProductForm({
     const stockActuel = initial?.stockActuel ?? 0
     await onSubmit(formValuesToProduitForm(values, stockActuel))
   }
-
-  const showUnitaire = values.typeVente === 'piece' || values.typeVente === 'les_deux'
-  const showCarton = values.typeVente === 'carton' || values.typeVente === 'les_deux'
 
   return (
     <ScrollView
@@ -223,69 +187,30 @@ export default function ProductForm({
         </Pressable>
       </Field>
 
-      <Text style={styles.sectionLabel}>Type de vente</Text>
-      <View style={styles.segmented}>
-        {TYPE_OPTIONS.map((opt) => (
-          <Pressable
-            key={opt.value}
-            style={[
-              styles.segment,
-              values.typeVente === opt.value && styles.segmentActive,
-            ]}
-            onPress={() => set('typeVente', opt.value)}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                values.typeVente === opt.value && styles.segmentTextActive,
-              ]}
-            >
-              {opt.label}
+      {initial?.barcode ? (
+        <Field label="Code produit">
+          <View style={styles.codeBox}>
+            <Text style={styles.codeText} selectable>
+              {initial.barcode}
             </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <ConditionalBlock visible={showUnitaire}>
-        <Field label="Prix unitaire *" error={errors.prixUnitaire} shake={shakeKey === 'prixUnitaire'}>
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={values.prixUnitaire}
-            onChangeText={(t) => set('prixUnitaire', t)}
-            placeholder="0"
-          />
+          </View>
+          <Text style={styles.codeHint}>Généré automatiquement à la création</Text>
         </Field>
-      </ConditionalBlock>
+      ) : (
+        <Text style={styles.codeHint}>
+          Un code produit unique (ex. LOT-123456) sera généré à l&apos;enregistrement.
+        </Text>
+      )}
 
-      <ConditionalBlock visible={showCarton}>
-        <Field label="Prix carton *" error={errors.prixCarton} shake={shakeKey === 'prixCarton'}>
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={values.prixCarton}
-            onChangeText={(t) => set('prixCarton', t)}
-          />
-        </Field>
-        <Field
-          label="Unités par carton *"
-          error={errors.unitesParCarton}
-          shake={shakeKey === 'unitesParCarton'}
-        >
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={values.unitesParCarton}
-            onChangeText={(t) => set('unitesParCarton', t)}
-          />
-        </Field>
-      </ConditionalBlock>
-
-      <Field label="Unité">
-        <Pressable style={styles.selector} onPress={() => setUniteOpen(true)}>
-          <Text style={styles.selectorText}>{values.unite}</Text>
-          <ChevronDown size={18} color={Colors.textSecondary} />
-        </Pressable>
+      <Field label="Prix de vente *" error={errors.prix} shake={shakeKey === 'prix'}>
+        <TextInput
+          style={styles.input}
+          keyboardType="decimal-pad"
+          value={values.prix}
+          onChangeText={(t) => set('prix', t)}
+          placeholder="0"
+          placeholderTextColor={Colors.textTertiary}
+        />
       </Field>
 
       <View style={styles.row2}>
@@ -321,14 +246,14 @@ export default function ProductForm({
       </View>
 
       <Pressable
-        style={[styles.saveBtn, (saving || Object.keys(errors).length > 0) && styles.saveDisabled]}
+        style={[styles.saveBtn, saving && styles.saveDisabled]}
         onPress={handleSave}
         disabled={saving}
       >
         {success ? (
           <Check size={22} color={Colors.textInverse} strokeWidth={3} />
         ) : saving ? (
-          <ActivityIndicator color={Colors.textInverse} />
+          <Text style={styles.saveText}>Enregistrement…</Text>
         ) : (
           <Text style={styles.saveText}>Enregistrer</Text>
         )}
@@ -341,14 +266,6 @@ export default function ProductForm({
         selectedValue={values.categorie}
         onClose={() => setSelectorOpen(false)}
         onSelect={(o) => set('categorie', o.value)}
-      />
-      <Selector
-        visible={uniteOpen}
-        title="Unité"
-        options={UNITES.map((u) => ({ label: u, value: u }))}
-        selectedValue={values.unite}
-        onClose={() => setUniteOpen(false)}
-        onSelect={(o) => set('unite', o.value)}
       />
     </ScrollView>
   )
@@ -381,35 +298,25 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     marginTop: 4,
   },
-  sectionLabel: {
-    fontFamily: FontFamily.displaySemi,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginBottom: 10,
-  },
-  segmented: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
+  codeBox: {
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
+    padding: 14,
+    backgroundColor: Colors.surface,
   },
-  segment: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
+  codeText: {
+    fontFamily: FontFamily.displaySemi,
+    fontSize: 16,
+    color: Colors.textPrimary,
+    letterSpacing: 1,
   },
-  segmentActive: {
-    backgroundColor: Colors.textPrimary,
-  },
-  segmentText: {
-    fontFamily: FontFamily.utilityBold,
+  codeHint: {
+    fontFamily: FontFamily.content,
     fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  segmentTextActive: {
-    color: Colors.textInverse,
+    color: Colors.textTertiary,
+    marginBottom: 16,
+    marginTop: -8,
   },
   selector: {
     flexDirection: 'row',

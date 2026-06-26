@@ -5,7 +5,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { LicenceStatut, Licence, Boutique } from '../types'
+import { LicenceStatut, Licence, Boutique, AuthUser } from '../types'
+import { clearAuthSession } from '../lib/db/auth-session'
 
 interface AuthState {
   // Auth Google / Firebase
@@ -14,6 +15,8 @@ interface AuthState {
   displayName: string | null
   photoURL: string | null
   isAuthenticated: boolean
+  token: string | null
+  authUser: AuthUser | null
 
   // Onboarding
   isOnboardingComplete: boolean
@@ -33,6 +36,11 @@ interface AuthState {
     displayName: string
     photoURL?: string | null
   }) => void
+  setBackendSession: (session: {
+    token: string
+    user: AuthUser
+    licence: Licence
+  }) => void
   setOnboardingComplete: (isComplete: boolean) => void
   setLicence: (statut: LicenceStatut, licence?: Licence) => void
   setTentativesRestantes: (n: number) => void
@@ -48,6 +56,8 @@ export const useAuthStore = create<AuthState>()(
       displayName: null,
       photoURL: null,
       isAuthenticated: false,
+      token: null,
+      authUser: null,
       isOnboardingComplete: false,
       licenceStatut: null,
       licence: null,
@@ -63,6 +73,19 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
         }),
 
+      setBackendSession: ({ token, user, licence }) =>
+        set({
+          uid: user.id,
+          email: user.email,
+          displayName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+          photoURL: null,
+          token,
+          authUser: user,
+          isAuthenticated: true,
+          licenceStatut: licence.statut,
+          licence,
+        }),
+
       setOnboardingComplete: (isComplete) =>
         set({ isOnboardingComplete: isComplete }),
 
@@ -75,16 +98,20 @@ export const useAuthStore = create<AuthState>()(
       setBoutique: (boutique) =>
         set({ boutique }),
 
-      logout: () =>
+      logout: () => {
+        void clearAuthSession()
         set({
           uid: null,
           email: null,
           displayName: null,
           photoURL: null,
+          token: null,
+          authUser: null,
           isAuthenticated: false,
           licenceStatut: null,
           licence: null,
-        }),
+        })
+      },
     }),
     {
       name: 'lotus-auth-storage',
@@ -95,8 +122,12 @@ export const useAuthStore = create<AuthState>()(
         email: state.email,
         displayName: state.displayName,
         photoURL: state.photoURL,
+        token: state.token,
+        authUser: state.authUser,
         isAuthenticated: state.isAuthenticated,
         isOnboardingComplete: state.isOnboardingComplete,
+        licenceStatut: state.licenceStatut,
+        licence: state.licence,
         boutique: state.boutique,
       }),
     }

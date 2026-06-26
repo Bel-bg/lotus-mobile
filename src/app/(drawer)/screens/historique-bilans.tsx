@@ -148,7 +148,7 @@ export default function HistoriqueBilansScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => router.replace("/documents")}
+          onPress={() => {}}
           style={styles.iconButton}
           activeOpacity={0.75}
         >

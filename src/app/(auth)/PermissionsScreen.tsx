@@ -60,22 +60,10 @@ const PERMISSIONS: PermissionConfig[] = [
     title: 'Appareils à proximité',
     subtitle: "DÉTECTION IMPRIMANTE",
     type: 'required',
-    color: '#FF9800', // Orange
+    color: '#FF9800', 
     initialStatus: 'pending',
     alertTitle: 'Appareils à proximité',
     alertDescription: 'Permet à Lotus Business de détecter et communiquer avec votre matériel localement.',
-  },
-  {
-    id: 'drive',
-    icon: Cloud,
-    iconName: 'Cloud',
-    title: 'Google Drive',
-    subtitle: "SAUVEGARDE CLOUD",
-    type: 'optional',
-    color: '#9C27B0', // Violet
-    initialStatus: 'coming_soon',
-    alertTitle: 'Google Drive',
-    alertDescription: 'La sauvegarde automatique sur Google Drive sera bientôt disponible.',
   },
 ]
 

@@ -17,10 +17,10 @@ export default function LoadingOverlay() {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    
     zIndex: 9999,
     elevation: 9999,
   },

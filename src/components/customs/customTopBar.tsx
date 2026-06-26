@@ -2,26 +2,29 @@
 // LOTUS BUSINESS — Composant : CustomTopBar
 // ============================================
 
-import { DrawerNavigationProp } from "@react-navigation/drawer";
-import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/routers";
+import { NavigationContext } from "@react-navigation/core";
 import { useRouter } from "expo-router";
 import {
   Bell,
   Calendar,
-  LayersPlus,
   Menu,
-  Search,
-  User,
+  TextAlignStart,
+  History,
 } from "lucide-react-native";
 import React from "react";
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Image } from "expo-image";
-import Animated, { FadeInDown } from "react-native-reanimated";
 import { Colors } from "../../constants/colors";
 import { FontFamily } from "../../constants/typography";
 import BluetoothBadge from "../ui/BluetoothBadge";
-import MenuIcon from "@/assets/icons/menu.png";
-import NotifsIcon from "@/assets/icons/notification.png";
+import StatusBadge from "./StatusBadge";
 
 export type TopBarType =
   | "home"
@@ -51,14 +54,15 @@ export default function CustomTopBar({
   onPressLayersPlus,
   onPressCalendar,
 }: CustomTopBarProps) {
-  const navigation = useNavigation<DrawerNavigationProp<any>>();
+  // useContext retourne undefined si hors contexte — pas d'exception contrairement à useNavigation
+  const navContext = React.useContext(NavigationContext);
   const router = useRouter();
 
   const handlePressMenu = () => {
     if (onPressMenu) {
       onPressMenu();
     } else {
-      navigation.openDrawer();
+      navContext?.dispatch(DrawerActions.openDrawer());
     }
   };
 
@@ -77,42 +81,62 @@ export default function CustomTopBar({
     }
   };
   const handlePressProfile = () => {
-    router.push("/profil");
+    router.push("/(drawer)/screens/profil");
   };
 
   const renderContent = () => {
     switch (type) {
       case "home":
         return (
-          <>
+          <View
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              width: "100%",
+              justifyContent: "space-between",
+            }}
+          >
             <TouchableOpacity onPress={handlePressMenu} activeOpacity={0.7}>
-              <Image source={MenuIcon} style={styles.customIcon} contentFit="contain" />
+              {/* <Image
+                source={MenuIcon}
+                style={styles.customIcon}
+                contentFit="contain"
+              /> */}
+              <TextAlignStart size={24} />
             </TouchableOpacity>
-            <BluetoothBadge />
+            {/* <BluetoothBadge /> */}
+            <StatusBadge />
             <TouchableOpacity onPress={handlePressBell} activeOpacity={0.7}>
-              <Image source={NotifsIcon} style={styles.customIcon} contentFit="contain" />
+              <Bell size={24} />
             </TouchableOpacity>
-          </>
+          </View>
         );
       case "stock":
         return (
-          <View style={{paddingTop: Platform.OS === "ios" ? 0 : 30, display: "flex", flexDirection: "row", alignItems: "center", width: "100%", justifyContent: "space-between"}}>
-            <Text style={styles.title}>Stock</Text>
+          <View
+            style={{
+              // paddingTop: Platform.OS === "ios" ? 0 : 30,
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              width: "100%",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text style={styles.title}>Analyse</Text>
             <View style={styles.headerIcons}>
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 onPress={onPressSearch}
                 style={styles.iconButton}
                 activeOpacity={0.7}
               >
-                <Search size={20} color={Colors.textPrimary} strokeWidth={2.5} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handlePressLayersPlus}
-                style={styles.iconButton}
-                activeOpacity={0.7}
-              >
-                <LayersPlus size={20} color={Colors.textPrimary} strokeWidth={2.5} />
-              </TouchableOpacity>
+                <Search
+                  size={20}
+                  color={Colors.textPrimary}
+                  strokeWidth={2.5}
+                />
+              </TouchableOpacity> */}
             </View>
           </View>
         );
@@ -126,7 +150,11 @@ export default function CustomTopBar({
                 style={styles.datePicker}
                 activeOpacity={0.7}
               >
-                <Calendar size={18} color={Colors.textSecondary} strokeWidth={2.5} />
+                <Calendar
+                  size={18}
+                  color={Colors.textSecondary}
+                  strokeWidth={2.5}
+                />
                 <Text style={styles.dateText}>{date || "Aujourd'hui"}</Text>
               </TouchableOpacity>
             </View>
@@ -154,39 +182,23 @@ export default function CustomTopBar({
             </View>
           </>
         );
-      case "sauvegarde":
-        return (
-          <>
-            <Text style={styles.title}>Sauvegarde</Text>
-            <View style={styles.headerIcons}>
-              <TouchableOpacity
-                onPress={handlePressProfile}
-                style={styles.iconButton}
-                activeOpacity={0.7}
-              >
-                <User size={22} color={Colors.textPrimary} strokeWidth={2.5} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handlePressMenu}
-                style={styles.iconButton}
-                activeOpacity={0.7}
-              >
-                <Menu size={20} color={Colors.textPrimary} strokeWidth={2.5} />
-              </TouchableOpacity>
-            </View>
-          </>
-        );
       case "mouvement":
         return (
           <>
-            <Text style={styles.title}>Mouvements</Text>
+            <Text style={styles.title}>Activités</Text>
             <View style={styles.headerIcons}>
               <TouchableOpacity
-                onPress={handlePressMenu}
+                onPress={() => {
+                  router.replace('/(drawer)/screens/historique');
+                }}
                 style={styles.iconButton}
                 activeOpacity={0.7}
               >
-                <Menu size={20} color={Colors.textPrimary} strokeWidth={2.5} />
+                <History
+                  size={20}
+                  color={Colors.textPrimary}
+                  strokeWidth={2.5}
+                />
               </TouchableOpacity>
             </View>
           </>
@@ -232,9 +244,8 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: FontFamily.display,
     fontSize: 28,
-    fontWeight: "bold",
     color: Colors.textPrimary,
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
   },
   headerIcons: {
     flexDirection: "row",

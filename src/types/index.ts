@@ -11,7 +11,23 @@ export interface Licence {
   statut: LicenceStatut
   dateExpiration: string  // ISO 8601
   dateCreation: string    // ISO 8601
+  code?: string
+  nom?: string
+  telephone?: string
+  type?: 'free' | 'premium'
   notes?: string
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  phone?: string
+  firstName?: string
+  lastName?: string
+  licenseKey: string
+  licenseType: 'FREE' | 'PREMIUM' | string
+  licenseStatus: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | string
+  expirationDate: string
 }
 
 // --- Boutique ---
@@ -49,6 +65,7 @@ export interface Produit {
   categorie: string
   barcode?: string
   prixUnitaire: number | null
+  prixAchat: number | null
   prixCarton: number | null
   unitesParCarton: number | null
   typeVente: TypeVente
@@ -64,6 +81,7 @@ export interface ProduitForm {
   nom: string
   categorie: string
   prixUnitaire: number | null
+  prixAchat: number | null
   prixCarton: number | null
   unitesParCarton: number | null
   typeVente: TypeVente
@@ -135,66 +153,78 @@ export interface Bilan {
 }
 
 
+// --- Clients ---
 
-export const Routes = {
-  // --- Auth & Onboarding ---
-  SPLASH: 'Splash',
-  LOADING: 'Loading',
-  ONBOARDING_1: 'Onboarding1',
-  ONBOARDING_2: 'Onboarding2',
-  ONBOARDING_3: 'Onboarding3',
-  PERMISSIONS: 'Permissions',
-  GOOGLE_SIGNIN: 'GoogleSignIn',
-  SETUP_BOUTIQUE: 'SetupBoutique',
+export interface Client {
+  id: string
+  nom: string
+  telephone?: string
+  email?: string
+  adresse?: string
+  note?: string
+  createdAt: string
+  updatedAt: string
+}
 
-  // --- Sécurité ---
-  VERIFYING: 'Verifying',
-  ACCESS_DENIED: 'AccessDenied',
-  BANNED: 'Banned',
-  LICENCE_EXPIRED: 'LicenceExpired',
+export interface ClientForm {
+  nom: string
+  telephone?: string
+  email?: string
+  adresse?: string
+  note?: string
+}
 
-  // --- App principale (Tab Bar) ---
-  MAIN: 'Main',
-  HOME: 'Home',
-  STOCK: 'Stock',
-  BILAN: 'Bilan',
-  PROFIL: 'Profil',
+// --- Dettes clients ---
 
-  // --- Ventes ---
-  NOUVELLE_VENTE: 'NouvelleVente',
-  CONFIRMATION_VENTE: 'ConfirmationVente',
-  SUCCESS_VENTE: 'SuccessVente',
-  DETAIL_VENTE: 'DetailVente',
-  HISTORIQUE_VENTES: 'HistoriqueVentes',
+export type DetteStatut = 'en_cours' | 'soldee' | 'annulee'
 
-  // --- Stock ---
-  DETAIL_PRODUIT: 'DetailProduit',
-  AJOUTER_PRODUIT: 'AjouterProduit',
-  MODIFIER_PRODUIT: 'ModifierProduit',
-  ENTREE_STOCK: 'EntreeStock',
-  ALERTES_STOCK: 'AlertesStock',
+export interface DetteClient {
+  id: string
+  clientId: string
+  clientNom?: string       // jointure optionnelle
+  venteId?: string
+  montantTotal: number
+  montantPaye: number
+  solde: number            // colonne virtuelle : montantTotal - montantPaye
+  statut: DetteStatut
+  dateEcheance?: string
+  note?: string
+  createdAt: string
+  updatedAt: string
+}
 
-  // --- Bilan ---
-  HISTORIQUE_BILANS: 'HistoriqueBilans',
-  SUCCESS_CLOTURE: 'SuccessCloture',
+export interface DetteClientForm {
+  clientId: string
+  venteId?: string
+  montantTotal: number
+  dateEcheance?: string
+  note?: string
+}
 
-  // --- PDF ---
-  PDF_PREVIEW: 'PdfPreview',
+export interface PaiementDette {
+  id: string
+  detteId: string
+  montant: number
+  note?: string
+  createdAt: string
+}
 
-  // --- États ---
-  EMPTY_STATE: 'EmptyState',
-  DRIVE_ERROR: 'DriveError',
-  RECONNECT_GOOGLE: 'ReconnectGoogle',
-} as const
+// --- Configuration niveaux de stock ---
 
-export type RouteName = typeof Routes[keyof typeof Routes]
+export type NiveauStock = 'faible' | 'moyen' | 'bon'
 
-// Stacks de navigation
-export const Stacks = {
-  AUTH: 'AuthStack',
-  SECURITY: 'SecurityStack',
-  APP: 'AppStack',
-  STOCK_STACK: 'StockStack',
-  VENTES_STACK: 'VentesStack',
-  BILAN_STACK: 'BilanStack',
-} as const
+export interface StockConfig {
+  /** Stock ≤ seuilFaible → Faible (rouge) */
+  seuilFaible: number
+  /** seuilFaible < stock ≤ seuilMoyen → Moyen (orange) */
+  seuilMoyen: number
+  /** stock > seuilMoyen → Bon (vert) */
+  updatedAt?: string
+}
+
+/** Retourne le niveau de stock d'un produit selon la config définie */
+export function getNiveauStock(stockActuel: number, config: StockConfig): NiveauStock {
+  if (stockActuel <= config.seuilFaible) return 'faible'
+  if (stockActuel <= config.seuilMoyen) return 'moyen'
+  return 'bon'
+}

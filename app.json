@@ -10,6 +10,7 @@
     "android": {
       "package": "com.litxx.lotusbusiness",
       "versionCode": 1,
+      "navigationBar": { "backgroundColor": "#FFFFFF" } ,
       "adaptiveIcon": {
         "foregroundImage": "./assets/lotus.png",
         "backgroundColor": "#FFFFFF"
@@ -28,7 +29,6 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.CAMERA"
       ]
-
     },
     "ios": {
       "bundleIdentifier": "com.litxx.lotusbusiness",
@@ -81,8 +81,12 @@
           }
         }
       ],
-      "@react-native-google-signin/google-signin",
-      "expo-asset"
+      "expo-asset",
+      "expo-media-library",
+      "expo-sharing",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

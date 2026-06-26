@@ -4,7 +4,7 @@
 
 import { getDB } from './schema'
 import { Produit, ProduitForm } from '../../types'
-import { generateId, getDateTimeISO } from '../utils'
+import { generateId, generateProduitCode, getDateTimeISO } from '../utils'
 
 /**
  * Récupère tous les produits
@@ -70,16 +70,19 @@ export async function createProduit(form: ProduitForm): Promise<Produit> {
   const db = getDB()
   const id = generateId()
   const now = getDateTimeISO()
+  const code = generateProduitCode()
 
   await db.runAsync(
     `INSERT INTO produits
-      (id, nom, categorie, prix_unitaire, prix_carton, unites_par_carton, type_vente, stock_actuel, stock_min, stock_max, unite, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, nom, barcode, categorie, prix_unitaire, prix_achat, prix_carton, unites_par_carton, type_vente, stock_actuel, stock_min, stock_max, unite, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       form.nom,
+      code,
       form.categorie,
       form.prixUnitaire,
+      form.prixAchat ?? null,
       form.prixCarton,
       form.unitesParCarton,
       form.typeVente,
@@ -108,6 +111,7 @@ export async function updateProduit(id: string, form: Partial<ProduitForm>): Pro
   if (form.nom !== undefined) { fields.push('nom = ?'); values.push(form.nom) }
   if (form.categorie !== undefined) { fields.push('categorie = ?'); values.push(form.categorie) }
   if (form.prixUnitaire !== undefined) { fields.push('prix_unitaire = ?'); values.push(form.prixUnitaire) }
+  if (form.prixAchat !== undefined) { fields.push('prix_achat = ?'); values.push(form.prixAchat) }
   if (form.prixCarton !== undefined) { fields.push('prix_carton = ?'); values.push(form.prixCarton) }
   if (form.unitesParCarton !== undefined) { fields.push('unites_par_carton = ?'); values.push(form.unitesParCarton) }
   if (form.typeVente !== undefined) { fields.push('type_vente = ?'); values.push(form.typeVente) }
@@ -191,6 +195,7 @@ function mapRowToProduit(row: any): Produit {
     barcode: row.barcode ?? undefined,
     categorie: row.categorie,
     prixUnitaire: row.prix_unitaire,
+    prixAchat: row.prix_achat ?? null,
     prixCarton: row.prix_carton,
     unitesParCarton: row.unites_par_carton,
     typeVente: row.type_vente,
@@ -200,5 +205,51 @@ function mapRowToProduit(row: any): Produit {
     unite: row.unite,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  }
+}
+
+/**
+ * Statistiques d'inventaire pour le dashboard
+ * (remplace les requêtes SQL inline dans inventaire/index.tsx)
+ */
+export interface InventaireStats {
+  totalProduits: number
+  totalCategories: number
+  valeurStock: number
+  alertesCount: number
+  produitsEnAlerte: Pick<Produit, 'id' | 'nom' | 'categorie' | 'stockActuel' | 'stockMin'>[]
+}
+
+export async function getInventaireStats(): Promise<InventaireStats> {
+  const db = getDB()
+
+  const [produits, categories] = await Promise.all([
+    db.getAllAsync<any>('SELECT * FROM produits'),
+    db.getAllAsync<{ nom: string }>('SELECT nom FROM categories'),
+  ])
+
+  const valeurStock = produits.reduce((acc: number, p: any) => {
+    const prix =
+      p.prix_unitaire ??
+      (p.prix_carton && p.unites_par_carton
+        ? p.prix_carton / p.unites_par_carton
+        : 0)
+    return acc + prix * p.stock_actuel
+  }, 0)
+
+  const enAlerte = produits.filter((p: any) => p.stock_actuel <= p.stock_min)
+
+  return {
+    totalProduits: produits.length,
+    totalCategories: categories.length,
+    valeurStock,
+    alertesCount: enAlerte.length,
+    produitsEnAlerte: enAlerte.slice(0, 3).map((p: any) => ({
+      id: p.id,
+      nom: p.nom,
+      categorie: p.categorie,
+      stockActuel: p.stock_actuel,
+      stockMin: p.stock_min,
+    })),
   }
 }

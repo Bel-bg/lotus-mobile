@@ -30,7 +30,7 @@ export default function MoveFooter({ hasMore, extraCount }: MoveFooterProps) {
       )}
 
       {/* Bouton Historique complet */}
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={styles.historyButton}
         activeOpacity={0.85}
         onPress={() => router.push("/(drawer)/screens/historique")}
@@ -47,7 +47,7 @@ export default function MoveFooter({ hasMore, extraCount }: MoveFooterProps) {
           </View>
         </View>
         <ArrowRight size={18} color={Colors.textSecondary} strokeWidth={2.2} />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 }
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   footerWrap: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 40,
+    paddingBottom: 50,
     gap: 12,
   },
   moreHint: {

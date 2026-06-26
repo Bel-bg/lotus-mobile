@@ -16,7 +16,7 @@ import { Radius, Spacing } from "@/constants/layout";
 import {
   chunkEmojis,
   filterEmojiCategories,
-} from "../data/emoji-data";
+} from "../../../../../../features/news/data/emoji-data";
 
 type SectionRow = {
   key: string;

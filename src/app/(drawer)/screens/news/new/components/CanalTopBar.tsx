@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import {
   Bell,
   BellOff,
@@ -8,8 +8,8 @@ import {
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
 import { Layout, Radius } from "@/constants/layout";
-import { formatSubscriberCount } from "../utils/canal-list";
-
+import { formatSubscriberCount } from "../../../../../../features/news/utils/canal-list";
+import Avatar from "@/assets/lotus.png";
 type Props = {
   onBack: () => void;
   channelName: string;
@@ -37,7 +37,7 @@ export default function CanalTopBar({
 
       <View style={styles.center}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{avatarLabel}</Text>
+          <Image source={Avatar} style={styles.avatarImage} />
         </View>
         <View style={styles.titles}>
           <Text style={styles.title} numberOfLines={1}>
@@ -99,10 +99,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.successBorder,
   },
-  avatarText: {
-    color: Colors.successText,
-    fontFamily: FontFamily.utilityBold,
-    fontSize: FontSize.sm,
+  avatarImage: {
+    width: Layout.avatarMd,
+    height: Layout.avatarMd,
   },
   titles: {
     marginLeft: 10,

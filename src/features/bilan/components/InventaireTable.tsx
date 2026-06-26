@@ -104,7 +104,7 @@ export default function InventaireTable({
 const styles = StyleSheet.create({
   card: {
     padding: 20,
-    borderRadius: 28,
+    borderRadius: 6,
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,

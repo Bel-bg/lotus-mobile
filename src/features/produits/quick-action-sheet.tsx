@@ -169,7 +169,7 @@ export default function QuickActionSheet({
           <View style={styles.handle} />
           <Text style={styles.productName} numberOfLines={1}>{produit.nom}</Text>
           <Text style={styles.stockCtx}>
-            Stock actuel : <Text style={styles.stockBold}>{stockActuel}</Text> {produit.unite}
+            Stock actuel : <Text style={styles.stockBold}>{stockActuel}</Text>
           </Text>
 
           <Animated.View style={[styles.toggleRow, toggleBgStyle]}>

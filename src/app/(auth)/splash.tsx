@@ -3,24 +3,39 @@
 // ============================================
 
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Dimensions, StatusBar, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
   withSequence,
-  withTiming
+  withTiming,
 } from "react-native-reanimated";
 import { NAVIGATION_CONFIG } from "../../store/config";
 import { useAuthStore } from "../../store/useAuthStore";
+import { useLoadingStore } from "../../store/useLoadingStore";
 import { FontFamily } from "@/constants";
-import { initDB, getBoutique, isBoutiqueConfigured } from "../../lib/db";
+import { getAuthSession, getLocalLicenceStatus, initDB, getBoutique, isBoutiqueConfigured } from "../../lib/db";
+import { mapBackendStatus } from "../../lib/db/auth-session";
+import { AuthUser, Licence, LicenceStatut } from "../../types";
 
 const { width } = Dimensions.get("window");
+
+function buildLicenceFromAuthUser(user: AuthUser, statut?: LicenceStatut): Licence {
+  return {
+    code: user.licenseKey,
+    email: user.email,
+    nom: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+    telephone: user.phone,
+    type: user.licenseType?.toUpperCase() === 'PREMIUM' ? 'premium' : 'free',
+    statut: statut ?? mapBackendStatus(user.licenseStatus),
+    dateCreation: new Date().toISOString(),
+    dateExpiration: user.expirationDate,
+  };
+}
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -34,68 +49,115 @@ export default function SplashScreen() {
   const taglineOpacity = useSharedValue(0);
   const progressWidth = useSharedValue(0);
 
-  // Résultat de la vérification DB (null = en cours)
-  const dbCheckResult = useRef<boolean | null>(null);
+  const [isHydrated, setIsHydrated] = useState<boolean>(() =>
+    typeof useAuthStore.persist?.hasHydrated === "function"
+      ? useAuthStore.persist.hasHydrated()
+      : true,
+  );
+  const [splashFinished, setSplashFinished] = useState(false);
 
-  const { isAuthenticated, setOnboardingComplete, setBoutique } = useAuthStore();
+  useEffect(() => {
+    if (typeof useAuthStore.persist?.onHydrate === "function") {
+      const unsubscribe = useAuthStore.persist.onHydrate(() => {
+        setIsHydrated(true);
+      });
+      return () => unsubscribe?.();
+    }
 
-  /**
-   * Vérifie la DB pendant l'animation.
-   * - Initialise SQLite si ce n'est pas déjà fait
-   * - Interroge réellement la table boutique
-   * - Resynchronise le store si nécessaire
-   */
-  const checkDatabase = useCallback(async () => {
-    try {
-      await initDB();
+    setIsHydrated(true);
+  }, []);
 
-      if (!isAuthenticated) {
-        dbCheckResult.current = false;
-        return;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSplashFinished(true);
+    }, NAVIGATION_CONFIG.splashDureeMs);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated || !splashFinished) return;
+
+    let isCancelled = false;
+
+    const performDBCheckAndNavigate = async () => {
+      const showLoading = useLoadingStore.getState().showLoading;
+      const hideLoading = useLoadingStore.getState().hideLoading;
+
+      showLoading();
+      try {
+        await initDB();
+        const configured = await isBoutiqueConfigured();
+
+        if (isCancelled) return;
+
+        const licenceStatus = await getLocalLicenceStatus();
+        const authSession = await getAuthSession();
+
+        if (!authSession || !licenceStatus || licenceStatus === 'non_autorise') {
+          router.replace("/(auth)/start-signin");
+          return;
+        }
+
+        if (licenceStatus === 'expire') {
+          useAuthStore.getState().setBackendSession({
+            token: authSession.token,
+            user: authSession.user,
+            licence: buildLicenceFromAuthUser(authSession.user, 'expire'),
+          });
+          router.replace("/(auth)/licenceExpiree");
+          return;
+        }
+
+        if (licenceStatus === 'suspendu') {
+          useAuthStore.getState().setBackendSession({
+            token: authSession.token,
+            user: authSession.user,
+            licence: buildLicenceFromAuthUser(authSession.user, 'suspendu'),
+          });
+          router.replace("/(auth)/licenceSuspendue");
+          return;
+        }
+
+        useAuthStore.getState().setBackendSession({
+          token: authSession.token,
+          user: authSession.user,
+          licence: buildLicenceFromAuthUser(authSession.user),
+        });
+
+        if (configured) {
+          const boutique = await getBoutique();
+          if (boutique) {
+            useAuthStore.getState().setBoutique(boutique);
+          }
+          useAuthStore.getState().setOnboardingComplete(true);
+          router.replace("/(drawer)/(tabs)");
+        } else {
+          useAuthStore.getState().setOnboardingComplete(false);
+          router.replace("/(auth)/successLicence");
+        }
+      } catch (error) {
+        console.warn("[SplashScreen] Erreur lors de la vérification DB :", error);
+        if (!isCancelled) {
+          router.replace("/(auth)/start-signin");
+        }
+      } finally {
+        hideLoading();
       }
+    };
 
-      const configured = await isBoutiqueConfigured();
+    const timer = setTimeout(() => {
+      performDBCheckAndNavigate();
+    }, 0);
 
-      if (configured) {
-        // Resynchroniser le store avec les données réelles de la DB
-        const boutique = await getBoutique();
-        if (boutique) setBoutique(boutique);
-        setOnboardingComplete(true);
-      } else {
-        setOnboardingComplete(false);
-      }
-
-      dbCheckResult.current = configured;
-    } catch (error) {
-      console.warn('[SplashScreen] Erreur vérification DB :', error);
-      // En cas d'erreur DB, on se base sur le store persisté
-      dbCheckResult.current = null;
-    }
-  }, [isAuthenticated, setBoutique, setOnboardingComplete]);
-
-  const handleInitialNavigation = useCallback(() => {
-    if (!isAuthenticated) {
-      router.replace("/(auth)/google-signin");
-      return;
-    }
-
-    // Priorité : résultat DB (source de vérité), sinon store persisté
-    const isReady = dbCheckResult.current ?? false;
-
-    if (!isReady) {
-      router.replace("/(auth)/google-signin");
-      return;
-    }
-
-    // Connecté + boutique configurée en DB → accueil direct
-    router.replace("/(drawer)/(tabs)");
-  }, [isAuthenticated, router]);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isHydrated, splashFinished, router]);
 
   useEffect(() => {
     StatusBar.setBarStyle("dark-content");
-
-    // Lancer la vérification DB en parallèle de l'animation
-    checkDatabase();
 
     // Phase 1: Logo Entrance (Scale + Fade + Bounce)
     logoScale.value = withTiming(1, {
@@ -111,11 +173,11 @@ export default function SplashScreen() {
       withRepeat(
         withSequence(
           withTiming(-10, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
-          withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.sin) })
+          withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
         ),
         -1,
-        true
-      )
+        true,
+      ),
     );
 
     // Phase 3: Text Entrance (Tightening effect)
@@ -125,7 +187,7 @@ export default function SplashScreen() {
       withTiming(-0.5, {
         duration: 1200,
         easing: Easing.out(Easing.exp),
-      })
+      }),
     );
 
     // Phase 4: Tagline Entrance
@@ -136,14 +198,15 @@ export default function SplashScreen() {
       duration: NAVIGATION_CONFIG.splashDureeMs,
       easing: Easing.linear,
     });
-
-    // Final Action: Navigation (après la durée du splash)
-    const timer = setTimeout(() => {
-      runOnJS(handleInitialNavigation)();
-    }, NAVIGATION_CONFIG.splashDureeMs);
-
-    return () => clearTimeout(timer);
-  }, []);
+  }, [
+    logoOpacity,
+    logoScale,
+    logoTranslationY,
+    progressWidth,
+    taglineOpacity,
+    textLetterSpacing,
+    textOpacity,
+  ]);
 
   // Animated Styles
   const animatedLogoStyle = useAnimatedStyle(() => ({

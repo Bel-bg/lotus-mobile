@@ -7,6 +7,7 @@ import type {
 } from "@/types/bilan";
 import { getBoutique } from "@/lib/db/boutique";
 import { updateBilanPdfPath } from "@/lib/db/bilans";
+import { getChargesParCategorie, getTotalCharges } from "@/lib/db/charges";
 import { getDB, initDB } from "@/lib/db/schema";
 import { formatDate, formatMontant } from "@/lib/utils/formatters";
 
@@ -136,7 +137,8 @@ export async function getBilanData(range: BilanDateRange): Promise<BilanData> {
   await initDB();
   const db = getDB();
   const normalizedRange = normalizeDateRange(range);
-  const [boutique, sortiesRows, entreesRows] = await Promise.all([
+  const [boutique, sortiesRows, entreesRows, totalCharges, chargesParCategorie] =
+    await Promise.all([
     getBoutique(),
     db.getAllAsync<any>(
       `SELECT
@@ -167,6 +169,8 @@ export async function getBilanData(range: BilanDateRange): Promise<BilanData> {
        ORDER BY total DESC, produit_nom COLLATE NOCASE ASC`,
       [normalizedRange.startDate, normalizedRange.endDate]
     ),
+    getTotalCharges(normalizedRange.startDate, normalizedRange.endDate),
+    getChargesParCategorie(normalizedRange.startDate, normalizedRange.endDate),
   ]);
 
   const sorties = sortiesRows.map(mapInventoryRow);
@@ -174,6 +178,10 @@ export async function getBilanData(range: BilanDateRange): Promise<BilanData> {
 
   const chiffreAffaires = sorties.reduce((sum, row) => sum + row.total, 0);
   const valeurStockEntre = entrees.reduce((sum, row) => sum + row.total, 0);
+  const margeBrute = chiffreAffaires - valeurStockEntre;
+  const chargesActives = Object.fromEntries(
+    Object.entries(chargesParCategorie).filter(([, value]) => value > 0)
+  );
 
   return {
     boutique,
@@ -185,7 +193,10 @@ export async function getBilanData(range: BilanDateRange): Promise<BilanData> {
       totalSorties: sorties.reduce((sum, row) => sum + row.quantite, 0),
       valeurStockEntre,
       chiffreAffaires,
-      margeBrute: chiffreAffaires - valeurStockEntre,
+      margeBrute,
+      totalCharges,
+      chargesParCategorie: chargesActives,
+      beneficeNet: margeBrute - totalCharges,
       mouvementCount: entrees.length + sorties.length,
     },
   };
@@ -209,6 +220,10 @@ export function buildBilanPdfHtml(data: BilanData): string {
   const boutiqueEmail = data.boutique?.email?.trim();
   const label = getDateRangeLabel(data.range);
   const marginTone = data.summary.margeBrute >= 0 ? "#166534" : "#B91C1C";
+  const netTone = data.summary.beneficeNet >= 0 ? "#166534" : "#B91C1C";
+  const chargeRows = Object.entries(data.summary.chargesParCategorie).filter(
+    ([, value]) => value > 0
+  );
 
   const renderTableRows = (rows: BilanInventoryRow[]) =>
     rows.length === 0
@@ -355,7 +370,55 @@ export function buildBilanPdfHtml(data: BilanData): string {
               data.summary.margeBrute
             )}</div>
           </div>
+          ${
+            data.summary.totalCharges > 0
+              ? `
+                <div class="summary-card">
+                  <div class="summary-label">Charges annexes</div>
+                  <div class="summary-value margin">${formatMontant(
+                    data.summary.totalCharges
+                  )}</div>
+                </div>
+                <div class="summary-card">
+                  <div class="summary-label">Bénéfice net</div>
+                  <div class="summary-value margin" style="color:${netTone}">${formatMontant(
+                    data.summary.beneficeNet
+                  )}</div>
+                </div>
+              `
+              : ""
+          }
         </section>
+
+        ${
+          chargeRows.length > 0
+            ? `
+              <section class="section">
+                <h2 class="section-title">Détail des charges annexes</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Catégorie</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${chargeRows
+                      .map(
+                        ([categorie, montant]) => `
+                          <tr>
+                            <td>${escapeHtml(categorie)}</td>
+                            <td>${formatMontant(montant)}</td>
+                          </tr>
+                        `
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </section>
+            `
+            : ""
+        }
 
         <section class="section">
           <h2 class="section-title">Inventaire des sorties</h2>

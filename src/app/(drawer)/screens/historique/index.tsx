@@ -32,6 +32,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Loader from "@/components/ui/loader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -230,8 +231,7 @@ export default function HistoriqueScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <History size={18} color={Colors.textPrimary} strokeWidth={2.2} />
-          <Text style={styles.headerTitle}>Historique complet</Text>
+          <Text style={styles.headerTitle}>Historique</Text>
         </View>
 
         <View style={styles.backBtn} />
@@ -317,8 +317,7 @@ export default function HistoriqueScreen() {
       {/* Contenu */}
       {isLoading ? (
         <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={Colors.textPrimary} />
-          <Text style={styles.loaderText}>Chargement de l'historique...</Text>
+          <Loader />
         </View>
       ) : activeTab === "ventes" ? (
         <>
@@ -326,7 +325,7 @@ export default function HistoriqueScreen() {
             data={ventesPage}
             keyExtractor={(item) => item.id}
             renderItem={renderVenteItem}
-            ListHeaderComponent={renderHeader}
+            // ListHeaderComponent={renderHeader}
             ListEmptyComponent={renderEmpty("ventes")}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -348,7 +347,7 @@ export default function HistoriqueScreen() {
             data={entreesPage}
             keyExtractor={(item) => item.id}
             renderItem={renderEntreeItem}
-            ListHeaderComponent={renderHeader}
+            // ListHeaderComponent={renderHeader}
             ListEmptyComponent={renderEmpty("stock")}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -391,11 +390,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#F5F5F5",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#ECECEC",
   },
   headerCenter: {
     flexDirection: "row",
@@ -475,8 +471,7 @@ const styles = StyleSheet.create({
 
   // Liste
   listContent: {
-    paddingBottom: 24,
-    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   listHeader: {
     paddingTop: 16,

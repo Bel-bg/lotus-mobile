@@ -26,6 +26,7 @@ export default function AnimatedStockBar({
   height = 8,
 }: AnimatedStockBarProps) {
   const statut = getStockStatut(produit)
+  const barColor = getStockColor(statut)
   const targetPct = getStockPourcentage(produit) / 100
   const fill = useSharedValue(0)
 
@@ -38,7 +39,6 @@ export default function AnimatedStockBar({
 
   const barStyle = useAnimatedStyle(() => ({
     width: `${fill.value * 100}%`,
-    backgroundColor: getStockColor(statut),
   }))
 
   return (
@@ -46,13 +46,13 @@ export default function AnimatedStockBar({
       {showLabels && (
         <View style={styles.header}>
           <Text style={styles.label}>Stock</Text>
-          <Text style={styles.value}>
-            {produit.stockActuel} {produit.unite}
-          </Text>
+          <Text style={styles.value}>{produit.stockActuel}</Text>
         </View>
       )}
       <View style={[styles.track, { height }]}>
-        <Animated.View style={[styles.fill, { height }, barStyle]} />
+        <Animated.View
+          style={[styles.fill, { height, backgroundColor: barColor }, barStyle]}
+        />
       </View>
     </View>
   )

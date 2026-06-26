@@ -1,5 +1,5 @@
-import { useIsFocused } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 
 import {
   getBilanData,
@@ -19,12 +19,14 @@ const EMPTY_DATA: BilanData = {
     valeurStockEntre: 0,
     chiffreAffaires: 0,
     margeBrute: 0,
+    totalCharges: 0,
+    chargesParCategorie: {},
+    beneficeNet: 0,
     mouvementCount: 0,
   },
 };
 
 export function useBilan(dateRange: BilanDateRange) {
-  const isFocused = useIsFocused();
   const [data, setData] = useState<BilanData>({
     ...EMPTY_DATA,
     range: normalizeDateRange(dateRange),
@@ -57,11 +59,12 @@ export function useBilan(dateRange: BilanDateRange) {
     [dateRange]
   );
 
-  useEffect(() => {
-    if (isFocused) {
+  // Recharge à chaque fois que l'écran est focalisé (navigation vers le tab)
+  useFocusEffect(
+    useCallback(() => {
       void loadBilan();
-    }
-  }, [isFocused, loadBilan]);
+    }, [loadBilan])
+  );
 
   return {
     data,

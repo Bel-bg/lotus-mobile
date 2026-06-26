@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,57 +11,34 @@ import { useFocusEffect, useRouter } from "expo-router";
 import {
   Package,
   ArrowRightLeft,
-  Tags,
   Barcode,
   Plus,
-  LayoutGrid,
+  Route,
   ChevronRight,
-  ArrowLeft,
-  ScanBarcode,
-  AlertTriangle,
-  InfoIcon,
+  InfinityIcon,
 } from "lucide-react-native";
 import { Colors } from "../../../../constants/colors";
+import { FontFamily } from "../../../../constants/typography";
 import CustomAlert from "../../../../components/customs/Alert";
-import { initDB } from "@/lib/db/schema";
-
-const colors = {
-  background: "#FAFAFA",
-  surface: "#FFFFFF",
-  border: "#EAEAEA",
-  textPrimary: "#0A0A0A",
-  textSecondary: "#6B6B6B",
-  accent: "#18181B",
-  success: "#16A34A",
-  successLight: "#F0FDF4",
-  warning: "#D97706",
-  warningLight: "#FFFBEB",
-  danger: "#DC2626",
-  dangerLight: "#FEF2F2",
-  primary: "#0A0A0A", // Main brand color
-};
+import { getInventaireStats, InventaireStats } from "@/lib/db/produits";
 
 export default function InventaireDashboard() {
   const router = useRouter();
   const [alertVisible, setAlertVisible] = useState(false);
-  const [produits, setProduits] = useState<any[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [stats, setStats] = useState<InventaireStats>({
+    totalProduits: 0,
+    totalCategories: 0,
+    valeurStock: 0,
+    alertesCount: 0,
+    produitsEnAlerte: [],
+  });
 
   const fetchStats = useCallback(async () => {
     try {
-      const db = await initDB();
-      
-      // Fetch all products
-      const allProduits = await db.getAllAsync<any>("SELECT * FROM produits");
-      setProduits(allProduits);
-
-      // Fetch unique categories
-      const distinctCats = await db.getAllAsync<{ nom: string }>(
-        "SELECT nom FROM categories"
-      );
-      setCategories(distinctCats.map(c => c.nom));
+      const data = await getInventaireStats();
+      setStats(data);
     } catch (error) {
-      console.error("Error fetching stats:", error);
+      console.error("Error fetching inventaire stats:", error);
     }
   }, []);
 
@@ -71,17 +48,7 @@ export default function InventaireDashboard() {
     }, [fetchStats])
   );
 
-  // Calculs dynamiques
-  const totalProduits = produits.length;
-  const totalCategories = categories.length;
-  const valeurStock = produits.reduce((acc, p) => {
-    let prix = p.prix_unitaire || (p.prix_carton && p.unites_par_carton ? p.prix_carton / p.unites_par_carton : 0);
-    return acc + (prix * p.stock_actuel);
-  }, 0);
-  
-  const valeurMoyenneProduit = totalProduits > 0 ? Math.round(valeurStock / totalProduits) : 0;
-  const alertesCount = produits.filter((p) => p.stock_actuel <= p.stock_min).length;
-  const produitsEnAlerte = produits.filter((p) => p.stock_actuel <= p.stock_min).slice(0, 3);
+  const { totalProduits, totalCategories, valeurStock, alertesCount, produitsEnAlerte } = stats;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,9 +94,10 @@ export default function InventaireDashboard() {
 
           <View style={styles.valeurDivider} />
 
+        </View>
         <Text style={styles.sectionTitle}>Action Rapide</Text>
           <MenuButton
-            title="Scanner"
+            title="Scanner un Produit"
             subtitle="Scannage rapide d'un produit"
             icon={Barcode}
             color="#f6a53b"
@@ -137,18 +105,28 @@ export default function InventaireDashboard() {
               router.push("/(drawer)/screens/inventaire/POScan/new")
             }
           />
-        </View>
-
-        <Text style={styles.sectionTitle}>Gestion Rapide</Text>
-
-        {/* Navigation Menu */}
-        <View>
           <MenuButton
-            title="Catalogue Complet"
-            subtitle="Voir et filtrer tous les produits"
-            icon={LayoutGrid}
+            title="Ajouter un Produit"
+            subtitle="Ajouter un nouveau produit au catalogue"
+            icon={Plus}
+            color="#990091"
+            onPress={() => router.push("/(drawer)/screens/inventaire/newproduct")}
+          />
+          <MenuButton
+            title="Charges & Annexes"
+            subtitle="Historique et résumé des dépenses"
+            icon={Route}
+            color="#ff0000"
+            onPress={() =>
+              router.push("/(drawer)/screens/Charges/history")
+            }
+          />
+          <MenuButton
+            title="Seuils d'Alertes"
+            subtitle="Définir les seuils d'alertes pour les produits"
+            icon={InfinityIcon}
             color="#3B82F6"
-            onPress={() => router.push("/(drawer)/screens/inventaire/products")}
+            onPress={() => router.push("/(drawer)/screens/inventaire/seuils-alertes")}
           />
           <MenuButton
             title="Mouvements de Stock"
@@ -156,67 +134,17 @@ export default function InventaireDashboard() {
             icon={ArrowRightLeft}
             color="#10B981"
             onPress={() =>
-              router.push("/(drawer)/screens/inventaire/mouvements")
+              router.replace('/(drawer)/screens/historique')
             }
           />
-          <MenuButton
-            title="Catégories"
-            subtitle={`${totalCategories} catégories configurées`}
-            icon={Tags}
-            color="#8B5CF6"
-            onPress={() =>
-              router.push("/(drawer)/screens/inventaire/newCategory")
-            }
-          />
-        </View>
-
-        {/* Derniers Alertes Aperçu */}
-        {alertesCount > 0 && (
-          <View style={styles.alertPreviewSection}>
-            <View style={styles.alertHeader}>
-              <Text style={styles.sectionTitleAlert}>
-                Produits en rupture imminente
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push("/(drawer)/screens/inventaire/products")
-                }
-              >
-                <Text style={styles.seeAllText}>Voir tout</Text>
-              </TouchableOpacity>
-            </View>
-
-            {produitsEnAlerte.map((prod) => (
-                <View key={prod.id} style={styles.alertItem}>
-                  <View style={styles.alertItemScanBarcode}>
-                    <Text style={styles.alertItemName}>{prod.nom}</Text>
-                    <Text style={styles.alertItemCat}>{prod.categorie}</Text>
-                  </View>
-                  <View style={styles.alertItemBadge}>
-                    <Text style={styles.alertItemBadgeText}>
-                      Reste {prod.stock_actuel}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-          </View>
-        )}
       </ScrollView>
-
-      <TouchableOpacity
-        style={styles.floatingButton}
-        onPress={() => router.push("/(drawer)/screens/inventaire/newproduct")}
-      >
-        <Plus size={20} color="#FFF" />
-      </TouchableOpacity>
-
       <CustomAlert
         isVisible={alertVisible}
         onClose={() => setAlertVisible(false)}
         title="Zone d'Inventaire"
         description="Cette zone vous permet de gérer votre stock de produits : voir la valeur totale du stock, consulter les alertes de rupture, accéder au catalogue complet, suivre les mouvements de stock et gérer les catégories de produits."
         iconName="Package"
-        color={colors.primary}
+        color={Colors.accent}
         primaryButtonLabel="Compris"
         onPrimaryPress={() => setAlertVisible(false)}
       />
@@ -267,17 +195,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: colors.primary,
+    color: Colors.accent,
     fontFamily: "Outfit_700Bold",
   },
   addButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primary,
+    backgroundColor: Colors.accent,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: colors.primary,
+    shadowColor: Colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -292,7 +220,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "transparent",
     // borderWidth: 1,
-    // borderColor: colors.border,
+    // borderColor: Colors.border,
     // padding: 24,
     // borderRadius: 20,
     // marginBottom: 24,
@@ -334,7 +262,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.warningLight,
+    backgroundColor: Colors.warningLight,
   },
   valeurEyebrow: {
     fontSize: 10,
@@ -343,7 +271,7 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_700Bold",
   },
   valeurCardLabel: {
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     fontSize: 15,
     fontFamily: "Outfit_600SemiBold",
   },
@@ -354,24 +282,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   valeurCardValue: {
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     fontSize: 36,
     fontWeight: "700",
     fontFamily: "Outfit_700Bold",
     letterSpacing: -1.2,
   },
   valeurCurrency: {
-    color: colors.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 14,
     marginLeft: 8,
     marginBottom: 6,
     fontFamily: "Outfit_600SemiBold",
   },
   valeurDescription: {
-    color: colors.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
-    fontFamily: "DMSans_400Regular",
+    fontFamily: FontFamily.content,
     marginBottom: 16,
   },
   valeurBadge: {
@@ -405,16 +333,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#FAFAFA",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: Colors.border,
   },
   valeurMetaText: {
-    color: colors.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 12,
     fontFamily: "Outfit_500Medium",
   },
   valeurDivider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: Colors.border,
     marginVertical: 18,
   },
   valeurInsightsRow: {
@@ -427,13 +355,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#FCFCFC",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: Colors.border,
   },
   insightCardAlert: {
     backgroundColor: "#FCFCFC",
   },
   insightCardAlertDanger: {
-    backgroundColor: colors.dangerLight,
+    backgroundColor: Colors.dangerLight,
     borderColor: "#FDD5D5",
   },
   insightIconShell: {
@@ -445,23 +373,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   insightLabel: {
-    color: colors.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 12,
     marginBottom: 6,
     fontFamily: "Outfit_500Medium",
   },
   insightValue: {
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     fontSize: 22,
     fontFamily: "Outfit_700Bold",
   },
   insightValueDanger: {
-    color: colors.danger,
+    color: Colors.danger,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     marginBottom: 16,
     fontFamily: "Outfit_700Bold",
   },
@@ -488,17 +416,17 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     marginBottom: 4,
     fontFamily: "Outfit_600SemiBold",
   },
   menuSubtitle: {
     fontSize: 13,
-    color: colors.textSecondary,
-    fontFamily: "DMSans_400Regular",
+    color: Colors.textSecondary,
+    fontFamily: FontFamily.content,
   },
   alertPreviewSection: {
-    backgroundColor: colors.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 16,
   },
@@ -511,7 +439,7 @@ const styles = StyleSheet.create({
   sectionTitleAlert: {
     fontSize: 16,
     fontWeight: "700",
-    color: colors.danger,
+    color: Colors.danger,
     fontFamily: "Outfit_700Bold",
   },
   seeAllText: {
@@ -525,7 +453,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: Colors.border,
   },
   alertItemScanBarcode: {
     flex: 1,
@@ -533,21 +461,21 @@ const styles = StyleSheet.create({
   alertItemName: {
     fontSize: 15,
     fontWeight: "600",
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     marginBottom: 4,
   },
   alertItemCat: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: Colors.textSecondary,
   },
   alertItemBadge: {
-    backgroundColor: colors.dangerLight,
+    backgroundColor: Colors.dangerLight,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
   },
   alertItemBadgeText: {
-    color: colors.danger,
+    color: Colors.danger,
     fontSize: 12,
     fontWeight: "600",
   },
@@ -558,10 +486,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.primary,
+    backgroundColor: Colors.accent,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: colors.primary,
+    shadowColor: Colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -576,7 +504,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
   },
   dropMenuContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: Colors.surface,
     marginTop: 60,
     marginHorizontal: 20,
     borderRadius: 12,
@@ -589,11 +517,11 @@ const styles = StyleSheet.create({
   dropMenuItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: Colors.border,
   },
   menuItemText: {
     fontSize: 16,
-    color: colors.textPrimary,
+    color: Colors.textPrimary,
     fontFamily: "Outfit_500Medium",
   },
 });

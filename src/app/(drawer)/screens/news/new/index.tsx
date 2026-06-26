@@ -7,6 +7,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,14 +25,17 @@ import EmptyCanal from "./components/EmptyCanal";
 import ImageViewerModal from "./components/ImageViewerModal";
 import ReplySheet from "./components/ReplySheet";
 import ScrollToBottomButton from "./components/ScrollToBottomButton";
-import { MOCK_CHANNEL } from "./data/canal.mock";
-import { useCanalStore } from "./store/useCanalStore";
-import { buildCanalListItems } from "./utils/canal-list";
-import { downloadChannelImages } from "./utils/download-images";
+import { MOCK_CHANNEL } from "../../../../../features/news/data/canal.mock";
+import { useCanalStore } from "../../../../../features/news/store/useCanalStore";
+import { buildCanalListItems } from "../../../../../features/news/utils/canal-list";
+import { downloadChannelImages } from "../../../../../features/news/utils/download-images";
 import {
   CanalListItem,
   ChannelAlertConfig,
-} from "./types/canal.types";
+} from "../../../../../features/news/types/canal.types";
+import { useEffect } from "react";
+import { ActivityIndicator, Text } from "react-native";
+import Loader from "@/components/ui/loader";
 
 const CHANNEL_BACKGROUND = require("@/assets/background.png");
 
@@ -59,9 +63,17 @@ export default function CanalScreen() {
   const messages = useCanalStore((state) => state.messages);
   const recentEmojis = useCanalStore((state) => state.recentEmojis);
   const isChannelReported = useCanalStore((state) => state.isChannelReported);
+  const loadingState = useCanalStore((state) => state.loadingState);
+  const loadError = useCanalStore((state) => state.loadError);
+  const loadMessages = useCanalStore((state) => state.loadMessages);
   const toggleReaction = useCanalStore((state) => state.toggleReaction);
   const sendReply = useCanalStore((state) => state.sendReply);
   const reportChannel = useCanalStore((state) => state.reportChannel);
+
+  // Charge les infos au premier affichage
+  useEffect(() => {
+    void loadMessages();
+  }, [loadMessages]);
 
   const listItems = useMemo(() => buildCanalListItems(messages), [messages]);
 
@@ -270,12 +282,31 @@ export default function CanalScreen() {
         style={styles.background}
         resizeMode="cover"
       >
+        {loadingState === "loading" && messages.length === 0 && (
+          <View style={styles.centerOverlay}>
+            <Loader />
+          </View>
+        )}
+
+        {loadingState === "error" && (
+          <View style={styles.centerOverlay}>
+            <Text style={styles.errorText}>{loadError}</Text>
+            <TouchableOpacity
+              onPress={() => void loadMessages()}
+              style={styles.retryBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.retryText}>Réessayer</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <FlatList
           ref={listRef}
           data={listItems}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          ListEmptyComponent={<EmptyCanal />}
+          ListEmptyComponent={loadingState !== "loading" ? <EmptyCanal /> : null}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + Spacing[8] },
@@ -366,5 +397,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing[3],
     paddingTop: Spacing[2],
     flexGrow: 1,
+  },
+  centerOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.7)",
+    zIndex: 10,
+    gap: 12,
+  },
+  errorText: {
+    color: Colors.danger ?? "#C0392B",
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
+  retryBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: Colors.accent ?? "#0A0A0A",
+  },
+  retryText: {
+    color: "#FFFFFF",
+    fontSize: 13,
   },
 });

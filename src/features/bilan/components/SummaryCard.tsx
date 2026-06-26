@@ -8,7 +8,6 @@ interface SummaryCardProps {
   value: string;
   tone?: "default" | "positive" | "negative";
   helper?: string;
-  fullWidth?: boolean;
 }
 
 export default function SummaryCard({
@@ -16,7 +15,6 @@ export default function SummaryCard({
   value,
   tone = "default",
   helper,
-  fullWidth = false,
 }: SummaryCardProps) {
   const valueColor =
     tone === "positive"
@@ -26,7 +24,7 @@ export default function SummaryCard({
       : Colors.textPrimary;
 
   return (
-    <View style={[styles.card, fullWidth && styles.fullWidth]}>
+    <View style={styles.card}>
       <Text style={styles.label} selectable>
         {label}
       </Text>
@@ -44,17 +42,16 @@ export default function SummaryCard({
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
+    flexBasis: "48%",
+    flexGrow: 0,
+    flexShrink: 1,
     minHeight: 124,
     padding: 18,
-    borderRadius: 24,
+    borderRadius: 6,
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
     justifyContent: "space-between",
-  },
-  fullWidth: {
-    flexBasis: "100%",
   },
   label: {
     fontFamily: FontFamily.utilityBold,

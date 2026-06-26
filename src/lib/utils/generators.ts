@@ -7,6 +7,15 @@ import { FACTURE_CONFIG } from "../../store/config";
 /**
  * Génère un UUID v4 simple
  */
+/**
+ * Code produit interne unique (remplace le code-barres)
+ * Format: LOT-123456
+ */
+export function generateProduitCode(): string {
+  const n = Math.floor(100000 + Math.random() * 900000);
+  return `LOT-${n}`;
+}
+
 export function generateId(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  ActivityIndicator,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router'
@@ -40,6 +39,7 @@ import QuickActionSheet from '@/features/produits/quick-action-sheet'
 import ProductStatsSection from '@/features/produits/product-stats-section'
 import CustomAlert from '@/components/customs/Alert'
 import CustomToast from '@/components/customs/toast'
+import Loader from '@/components/ui/loader'
 import { useStockStore } from '@/store/useStockStore'
 import { useAuthStore } from '@/store/useAuthStore'
 
@@ -102,7 +102,7 @@ export default function ProduitDetailScreen() {
     }, [load])
   )
 
-  const copyBarcode = async () => {
+  const copyCode = async () => {
     if (!produit?.barcode) return
     const ok = await copyText(produit.barcode)
     setToast({ visible: true, text: ok ? 'Code copié' : produit.barcode })
@@ -123,7 +123,7 @@ export default function ProduitDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={Colors.textPrimary} />
+        <Loader message="Chargement…" />
       </View>
     )
   }
@@ -140,10 +140,7 @@ export default function ProduitDetailScreen() {
   }
 
   const statut = getStockStatut(produit)
-  const ratio =
-    produit.unitesParCarton && produit.prixCarton && produit.prixUnitaire
-      ? (produit.prixCarton / produit.unitesParCarton / produit.prixUnitaire).toFixed(2)
-      : null
+  const prix = produit.prixUnitaire ?? produit.prixCarton
 
   const quickActions = [
     { key: 'entree', label: '+ Entrée', icon: Plus, onPress: () => openQuick('entree') },
@@ -204,40 +201,25 @@ export default function ProduitDetailScreen() {
             <Text style={styles.heroLabel}>Catégorie</Text>
             <Text style={styles.heroValue}>{produit.categorie}</Text>
           </View>
-          <Pressable style={styles.heroRow} onPress={copyBarcode} disabled={!produit.barcode}>
-            <Text style={styles.heroLabel}>Code-barres</Text>
+          <Pressable style={styles.heroRow} onPress={copyCode} disabled={!produit.barcode}>
+            <Text style={styles.heroLabel}>Code produit</Text>
             <View style={styles.barcodeRow}>
-              <Text style={styles.heroValue}>{produit.barcode ?? '—'}</Text>
+              <Text style={styles.heroValue} selectable>
+                {produit.barcode ?? '—'}
+              </Text>
               {produit.barcode ? <Copy size={14} color={Colors.textSecondary} /> : null}
             </View>
           </Pressable>
-          <View style={styles.heroRow}>
-            <Text style={styles.heroLabel}>Unité</Text>
-            <Text style={styles.heroValue}>{produit.unite}</Text>
-          </View>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(80)} style={styles.section}>
           <Text style={styles.sectionTitle}>Tarification</Text>
-          {(produit.typeVente === 'piece' || produit.typeVente === 'les_deux') && (
-            <Text style={styles.row}>
-              Prix unitaire :{' '}
-              <Text style={styles.rowBold}>
-                {produit.prixUnitaire?.toLocaleString('fr-FR')} {devise}
-              </Text>
+          <Text style={styles.row}>
+            Prix de vente :{' '}
+            <Text style={styles.rowBold}>
+              {prix != null ? `${prix.toLocaleString('fr-FR')} ${devise}` : '—'}
             </Text>
-          )}
-          {(produit.typeVente === 'carton' || produit.typeVente === 'les_deux') && (
-            <Text style={styles.row}>
-              Prix carton ({produit.unitesParCarton} u.) :{' '}
-              <Text style={styles.rowBold}>
-                {produit.prixCarton?.toLocaleString('fr-FR')} {devise}
-              </Text>
-            </Text>
-          )}
-          {ratio && (
-            <Text style={styles.rowMuted}>Ratio carton/unité : ×{ratio}</Text>
-          )}
+          </Text>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(160)} style={styles.section}>
@@ -282,7 +264,7 @@ export default function ProduitDetailScreen() {
             <Text style={styles.sectionTitle}>Historique</Text>
             <Pressable
               onPress={() =>
-                router.push('/(drawer)/screens/inventaire/mouvements' as never)
+                router.replace('/(drawer)/(tabs)/move')
               }
             >
               <Text style={styles.voirTout}>

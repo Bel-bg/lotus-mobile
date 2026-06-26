@@ -1,7 +1,3 @@
-// ============================================
-// LOTUS BUSINESS — MouvementCard
-// ============================================
-
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react-native";
@@ -22,29 +18,25 @@ export default function MouvementCard({
   dateSectionLabel,
 }: MouvementCardProps) {
   const isEntree = item.type === "entree";
-
-  // Valeurs sûres pour les formatters (on utilise une string vide si la date est absente)
   const createdAt = item.createdAt ?? "";
 
   return (
     <View>
-      {showDateSection ? (
+      {showDateSection && (
         <View style={styles.dateSection}>
           <Text style={styles.dateSectionText}>{dateSectionLabel}</Text>
         </View>
-      ) : null}
+      )}
 
       <View style={styles.itemCard}>
-        <View
-          style={[
-            styles.iconBox,
-            isEntree ? styles.iconBoxSuccess : styles.iconBoxDanger,
-          ]}
-        >
+        {/* Bande colorée gauche à la place de l'iconBox ronde */}
+        <View style={styles.stripe} />
+
+        <View style={[styles.iconBox, isEntree ? styles.iconBoxSuccess : styles.iconBoxDanger]}>
           {isEntree ? (
-            <ArrowDownRight size={20} color={Colors.success} strokeWidth={2.5} />
+            <ArrowDownRight size={18} color={Colors.success} strokeWidth={2.5} />
           ) : (
-            <ArrowUpRight size={20} color={Colors.danger} strokeWidth={2.5} />
+            <ArrowUpRight size={18} color={Colors.danger} strokeWidth={2.5} />
           )}
         </View>
 
@@ -53,28 +45,22 @@ export default function MouvementCard({
             <Text style={styles.itemTitle} numberOfLines={1}>
               {item.produitNom || "Produit inconnu"}
             </Text>
-            <Text
-              style={[styles.itemQuantity, isEntree ? styles.qtyIn : styles.qtyOut]}
-            >
-              {isEntree ? "+" : "-"}
-              {item.quantite}
+            <Text style={[styles.itemQuantity, isEntree ? styles.qtyIn : styles.qtyOut]}>
+              {isEntree ? "+" : "-"}{item.quantite}
             </Text>
           </View>
 
           <Text style={styles.itemMeta}>
             {isEntree ? "Entrée" : "Sortie"} •{" "}
             {createdAt ? formatTempsRelatif(createdAt) : "Date inconnue"}
+            {createdAt ? ` • ${formatHeure(createdAt)}` : ""}
           </Text>
 
-          <Text style={styles.itemDetail} numberOfLines={2}>
-            {item.reference ||
-              item.note ||
-              "Mouvement enregistré dans l'application"}
-          </Text>
-
-          {createdAt ? (
-            <Text style={styles.itemTime}>{formatHeure(createdAt)}</Text>
-          ) : null}
+          {(item.reference || item.note) && (
+            <Text style={styles.itemDetail} numberOfLines={2}>
+              {item.reference || item.note}
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -84,8 +70,8 @@ export default function MouvementCard({
 const styles = StyleSheet.create({
   dateSection: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 16,
+    paddingBottom: 6,
   },
   dateSectionText: {
     fontFamily: FontFamily.utilityBold,
@@ -94,62 +80,65 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textTransform: "uppercase",
   },
+
   itemCard: {
     flexDirection: "row",
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#EEEEEE",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingVertical: 14,
+    paddingRight: 20,
   },
+
+  stripe: {
+    width: 3,
+    alignSelf: "stretch",
+    marginRight: 14,
+  },
+
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
   iconBoxSuccess: { backgroundColor: Colors.successLight },
   iconBoxDanger: { backgroundColor: Colors.dangerLight },
+
   itemContent: { flex: 1 },
+
   itemTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    marginBottom: 4,
   },
   itemTitle: {
     flex: 1,
     fontFamily: FontFamily.utilityBold,
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.textPrimary,
   },
   itemQuantity: {
     fontFamily: FontFamily.display,
-    fontSize: 17,
+    fontSize: 16,
   },
   qtyIn: { color: Colors.successText },
   qtyOut: { color: Colors.dangerText },
+
   itemMeta: {
     fontFamily: FontFamily.utility,
     fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 4,
   },
   itemDetail: {
     fontFamily: FontFamily.content,
-    fontSize: 13,
-    color: Colors.textPrimary,
-    marginTop: 8,
-    lineHeight: 18,
-  },
-  itemTime: {
-    fontFamily: FontFamily.utility,
     fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 10,
+    marginTop: 4,
+    lineHeight: 17,
   },
 });

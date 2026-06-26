@@ -1,0 +1,35 @@
+# Inscription d'un Commerçant
+POST https://lotus-business-server.onrender.com/api/auth/register
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "belmondefio@gmail.com",
+  "phone": "+221771234567",
+  "firstName": "Jean",
+  "lastName": "Dupont"
+}
+
+
+# Connexion commerçant
+
+POST https://lotus-business-server.onrender.com/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "licenseKey": "LOT-4534-lead-8356"
+}
+
+
+# Clé de licence perdu
+
+POST https://lotus-business-server.onrender.com/api/auth/forgot-key
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "belmondefio@gmail.com"
+}
+
+

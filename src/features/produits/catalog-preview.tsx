@@ -9,18 +9,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
+  withSpring,
   withRepeat,
   withSequence,
-  withSpring,
+  withTiming,
   FadeInUp,
-  Easing,
 } from "react-native-reanimated";
 import { AlertTriangle, ChevronRight, Package } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
@@ -51,22 +50,20 @@ const PRIORITY: Record<StockStatut, number> = {
   ok: 3,
 };
 
+const PREVIEW_LIMIT = 20;
+
 function AnimatedCounter({ target }: { target: number }) {
   const [count, setCount] = React.useState(0);
 
   useEffect(() => {
-    const duration = 800;
-    const steps = 30;
-    const stepTime = duration / steps;
+    if (target === 0) return;
+    const steps = 24;
+    const stepTime = 700 / steps;
     let current = 0;
     const timer = setInterval(() => {
-      current += Math.ceil(target / steps);
-      if (current >= target) {
-        setCount(target);
-        clearInterval(timer);
-      } else {
-        setCount(current);
-      }
+      current = Math.min(current + Math.ceil(target / steps), target);
+      setCount(current);
+      if (current >= target) clearInterval(timer);
     }, stepTime);
     return () => clearInterval(timer);
   }, [target]);
@@ -88,29 +85,36 @@ function MiniStockBar({
   const fillWidth = useSharedValue(0);
 
   useEffect(() => {
-    fillWidth.value = withTiming(pct, { duration: 600, easing: Easing.out(Easing.cubic) });
+    fillWidth.value = withSpring(pct, {
+      damping: 18,
+      stiffness: 120,
+      mass: 0.8,
+    });
   }, [pct]);
+
+  const barColor =
+    statut === "rupture" || statut === "critique"
+      ? Colors.danger
+      : statut === "faible"
+        ? Colors.warning
+        : Colors.success;
 
   const barStyle = useAnimatedStyle(() => ({
     width: `${fillWidth.value * 100}%` as `${number}%`,
-    backgroundColor:
-      statut === "rupture" || statut === "critique"
-        ? Colors.danger
-        : statut === "faible"
-          ? Colors.warning
-          : Colors.success,
   }));
 
   return (
     <View style={styles.miniBarBg}>
-      <Animated.View style={[styles.miniBarFill, barStyle]} />
+      <Animated.View
+        style={[styles.miniBarFill, { backgroundColor: barColor }, barStyle]}
+      />
     </View>
   );
 }
 
 function StatutIcon({ statut }: { statut: StockStatut }) {
-  if (statut === "ok") return <Text style={styles.statutEmoji}>✅</Text>;
-  if (statut === "faible") return <Text style={styles.statutEmoji}>⚠️</Text>;
+  if (statut === "ok") return <Text style={styles.statutEmoji}>🟢</Text>;
+  if (statut === "faible") return <Text style={styles.statutEmoji}>🟠</Text>;
   return <Text style={styles.statutEmoji}>🔴</Text>;
 }
 
@@ -120,13 +124,16 @@ function AlertBadge({ count, onPress }: { count: number; onPress: () => void }) 
   useEffect(() => {
     if (count > 0) {
       translateX.value = withSequence(
-        withTiming(-4, { duration: 60 }),
+        withTiming(-4, { duration: 55 }),
         withRepeat(
-          withSequence(withTiming(4, { duration: 60 }), withTiming(-4, { duration: 60 })),
+          withSequence(
+            withTiming(4, { duration: 55 }),
+            withTiming(-4, { duration: 55 }),
+          ),
           3,
-          true
+          true,
         ),
-        withTiming(0, { duration: 60 })
+        withTiming(0, { duration: 55 }),
       );
     }
   }, [count]);
@@ -139,26 +146,85 @@ function AlertBadge({ count, onPress }: { count: number; onPress: () => void }) 
 
   return (
     <Animated.View style={shakeStyle}>
-      <TouchableOpacity style={styles.alertBadge} onPress={onPress} activeOpacity={0.8}>
-        <AlertTriangle size={13} color={Colors.warningText} strokeWidth={2.5} />
+      <TouchableOpacity
+        style={styles.alertBadge}
+        onPress={onPress}
+        activeOpacity={0.75}
+      >
         <Text style={styles.alertBadgeText}>
-          {count} produit{count > 1 ? "s" : ""} ⚠️
+          {count} produit{count > 1 ? "s" : ""}
         </Text>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
+//  Card individuelle (1 des 2 colonnes) 
+function ProduitCard({
+  item,
+  index,
+  isLastRow,
+  isRightCol,
+}: {
+  item: MiniProduit;
+  index: number;
+  isLastRow: boolean;
+  isRightCol: boolean;
+}) {
+  const router = useRouter();
+
+  return (
+    <Animated.View
+      style={styles.cardWrapper}
+      entering={FadeInUp.delay(Math.min(index, 6) * 30)
+        .springify()
+        .damping(16)
+        .stiffness(140)}
+    >
+      {/* Séparateur vertical central */}
+      {isRightCol && <View style={styles.colDivider} />}
+
+      <Pressable
+        onPress={() => router.push(`/(drawer)/(tabs)/produits/${item.id}`)}
+        style={({ pressed }) => [
+          styles.card,
+          pressed && styles.cardPressed,
+        ]}
+      >
+        {/* Statut + stock */}
+        <View style={styles.cardTopRow}>
+          <StatutIcon statut={item.statut} />
+          <Text style={styles.cardStock}>{item.stockActuel} en stock</Text>
+        </View>
+
+        {/* Nom */}
+        <Text style={styles.cardName} numberOfLines={2}>
+          {item.nom}
+        </Text>
+
+        {/* Barre */}
+        <MiniStockBar
+          current={item.stockActuel}
+          min={item.stockMin}
+          statut={item.statut}
+        />
+      </Pressable>
+
+      {/* Séparateur horizontal bas (sauf dernière ligne) */}
+      {!isLastRow && <View style={styles.rowDivider} />}
+    </Animated.View>
+  );
+}
+
+//  Composant principal 
 export default function CatalogPreview() {
   const router = useRouter();
   const produits = useStockStore((s) => s.produits);
   const loadProduits = useStockStore((s) => s.loadProduits);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProduits();
-    }, [loadProduits])
-  );
+  useEffect(() => {
+    loadProduits();
+  }, [loadProduits]);
 
   const miniProduits: MiniProduit[] = produits
     .map((p) => ({
@@ -169,9 +235,10 @@ export default function CatalogPreview() {
       statut: deriverStatut(p.stockActuel, p.stockMin),
     }))
     .sort((a, b) => PRIORITY[a.statut] - PRIORITY[b.statut])
-    .slice(0, 3);
+    .slice(0, PREVIEW_LIMIT);
 
   const alertesCount = produits.filter((p) => p.stockActuel <= p.stockMin).length;
+  const totalRows = Math.ceil(miniProduits.length / 2);
 
   const handleGoToCatalogue = () => {
     router.push("/(drawer)/(tabs)/produits/catalogue");
@@ -181,86 +248,96 @@ export default function CatalogPreview() {
 
   return (
     <View style={styles.container}>
+      {/*  Header  */}
       <TouchableOpacity
         style={styles.header}
         onPress={handleGoToCatalogue}
-        activeOpacity={0.7}
+        activeOpacity={0.65}
       >
         <View style={styles.headerLeft}>
           <Package size={15} color={Colors.textSecondary} strokeWidth={2} />
           <Text style={styles.headerLabel}>CATALOGUE</Text>
-          <View style={styles.headerCountPill}>
+         
+        </View>
+        <View style={styles.headerRight}>
+           <View style={styles.headerCountPill}>
             <AnimatedCounter target={produits.length} />
             <Text style={styles.headerCountSuffix}> produits</Text>
           </View>
+          <ChevronRight size={16} color={Colors.textTertiary} />
         </View>
-        <ChevronRight size={16} color={Colors.textTertiary} />
       </TouchableOpacity>
 
-      <View style={styles.miniCardsRow}>
-        {miniProduits.map((p, idx) => (
-          <Animated.View
-            key={p.id}
-            entering={FadeInUp.delay(idx * 60).springify()}
-            style={styles.miniCard}
-          >
-            <Pressable
-              onPress={() => router.push(`/(drawer)/(tabs)/produits/${p.id}`)}
-              style={({ pressed }) => [
-                styles.miniCardInner,
-                pressed && styles.miniCardPressed,
-              ]}
-            >
-              <View style={styles.miniCardHeader}>
-                <StatutIcon statut={p.statut} />
-                <Text style={styles.miniCardName} numberOfLines={1}>
-                  {p.nom}
-                </Text>
-              </View>
-              <Text style={styles.miniCardStock}>{p.stockActuel} en stock</Text>
-              <MiniStockBar current={p.stockActuel} min={p.stockMin} statut={p.statut} />
-            </Pressable>
-          </Animated.View>
-        ))}
-      </View>
+      {/*  Séparateur header / grid  */}
+      <View style={styles.divider} />
 
-      <View style={styles.footer}>
-        <AlertBadge count={alertesCount} onPress={handleGoToCatalogue} />
-        <TouchableOpacity
-          onPress={handleGoToCatalogue}
-          style={styles.voirToutBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.voirToutText}>Voir le catalogue →</Text>
-        </TouchableOpacity>
-      </View>
+      {/*  Grid 2 colonnes  */}
+      <FlatList
+        data={miniProduits}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        scrollEnabled={false}
+        renderItem={({ item, index }) => {
+          const rowIndex = Math.floor(index / 2);
+          const isLastRow = rowIndex === totalRows - 1;
+          const isRightCol = index % 2 === 1;
+
+          return (
+            <ProduitCard
+              item={item}
+              index={index}
+              isLastRow={isLastRow}
+              isRightCol={isRightCol}
+            />
+          );
+        }}
+      />
+
+      {/*  "N autres produits"  */}
+      {produits.length > PREVIEW_LIMIT && (
+        <>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            onPress={handleGoToCatalogue}
+            activeOpacity={0.6}
+            style={styles.moreHintWrapper}
+          >
+            <Text style={styles.moreHint}>
+              + {produits.length - PREVIEW_LIMIT} autre
+              {produits.length - PREVIEW_LIMIT > 1 ? "s" : ""} produit
+              {produits.length - PREVIEW_LIMIT > 1 ? "s" : ""}
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 20,
     marginBottom: 24,
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.background,
     overflow: "hidden",
   },
+
+  //  Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 14,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   headerLabel: {
     fontFamily: FontFamily.displaySemi,
@@ -273,8 +350,8 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     backgroundColor: Colors.surfaceAlt,
     borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
   },
   counterValue: {
     fontFamily: FontFamily.display,
@@ -287,88 +364,105 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
   },
-  miniCardsRow: {
-    flexDirection: "row",
-    padding: 12,
-    gap: 8,
+
+  //  Séparateurs
+  divider: {
+    height: StyleSheet.hairlineWidth,
   },
-  miniCard: {
+  // Trait vertical entre les 2 colonnes
+  colDivider: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+  },
+  // Trait horizontal en bas de chaque rangée (sauf dernière)
+  rowDivider: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+  },
+
+  //  Card wrapper (occupe 50% de la largeur)
+  cardWrapper: {
     flex: 1,
+    position: "relative",
   },
-  miniCardInner: {
-    backgroundColor: Colors.background,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 10,
-    gap: 4,
+
+  //  Card pressable
+  card: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 6,
   },
-  miniCardPressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.97 }],
+  cardPressed: {
+    opacity: 0.7,
+    backgroundColor: Colors.surfaceAlt,
   },
-  miniCardHeader: {
+
+  //  Contenu card
+  cardTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginBottom: 2,
+    justifyContent: "space-between",
   },
   statutEmoji: {
     fontSize: 11,
+    lineHeight: 16,
   },
-  miniCardName: {
-    fontFamily: FontFamily.displaySemi,
-    fontSize: 11,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  miniCardStock: {
+  cardStock: {
     fontFamily: FontFamily.content,
     fontSize: 10,
     color: Colors.textSecondary,
   },
+  cardName: {
+    fontFamily: FontFamily.displaySemi,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+  },
+
+  //  Bar
   miniBarBg: {
     height: 4,
     backgroundColor: Colors.surfaceAlt,
-    borderRadius: 2,
+    borderRadius: 99,
     overflow: "hidden",
-    marginTop: 4,
+    marginTop: 2,
   },
   miniBarFill: {
     height: "100%",
-    borderRadius: 2,
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  alertBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.warningLight,
-    borderWidth: 1,
-    borderColor: Colors.warningBorder,
     borderRadius: 99,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
   },
-  alertBadgeText: {
-    fontFamily: FontFamily.utilityBold,
-    fontSize: 11,
-    color: Colors.warningText,
+
+  //  Alert badge
+alertBadge: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 4,
+  backgroundColor: Colors.danger,
+  borderRadius: 99,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+},
+alertBadgeText: {
+  fontFamily: FontFamily.utilityBold,
+  fontSize: 11,
+  color: "#FFFFFF",
+},
+
+  //  More hint
+  moreHintWrapper: {
+    paddingVertical: 11,
+    alignItems: "center",
   },
-  voirToutBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  voirToutText: {
-    fontFamily: FontFamily.displaySemi,
+  moreHint: {
+    fontFamily: FontFamily.content,
     fontSize: 12,
     color: Colors.textSecondary,
   },

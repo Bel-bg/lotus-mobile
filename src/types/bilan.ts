@@ -1,4 +1,5 @@
 import type { Boutique } from "./index";
+import type { CategorieCharge } from "./charge";
 
 export type BilanShortcut = "today" | "week" | "month" | "custom";
 
@@ -22,6 +23,9 @@ export interface BilanSummary {
   valeurStockEntre: number;
   chiffreAffaires: number;
   margeBrute: number;
+  totalCharges: number;
+  chargesParCategorie: Partial<Record<CategorieCharge, number>>;
+  beneficeNet: number;
   mouvementCount: number;
 }
 

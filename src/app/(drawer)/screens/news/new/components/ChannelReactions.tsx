@@ -2,8 +2,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
 import { Radius, Shadow } from "@/constants/layout";
-import { Reaction } from "../types/canal.types";
-import { getTotalReactions } from "../utils/canal-list";
+import { Reaction } from "../../../../../../features/news/types/canal.types";
+import { getTotalReactions } from "../../../../../../features/news/utils/canal-list";
 
 type Props = {
   reactions: Reaction[];
@@ -52,7 +52,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 1,
     borderColor: Colors.border,
-    ...Shadow.sm,
   },
   emojiRow: {
     flexDirection: "row",

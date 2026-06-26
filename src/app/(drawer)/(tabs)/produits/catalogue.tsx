@@ -6,12 +6,11 @@ import {
   FlatList,
   RefreshControl,
   Pressable,
-  ActivityIndicator,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router'
 import Animated, { ZoomIn } from 'react-native-reanimated'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react-native'
+import { ArrowLeft, Plus } from 'lucide-react-native'
 import { Colors } from '@/constants/colors'
 import { FontFamily } from '@/constants/typography'
 import { useStockStore } from '@/store/useStockStore'
@@ -24,6 +23,7 @@ import MetricCards from '@/features/produits/metric-cards'
 import ProductCard from '@/features/produits/product-card'
 import QuickActionSheet from '@/features/produits/quick-action-sheet'
 import CustomAlert from '@/components/customs/Alert'
+import Loader from '@/components/ui/loader'
 
 const PAGE_SIZE = 20
 
@@ -55,14 +55,10 @@ export default function CatalogueScreen() {
   const [categories, setCategories] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [refreshing, setRefreshing] = useState(false)
-  const [selectionMode, setSelectionMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [quickProduct, setQuickProduct] = useState<Produit | null>(null)
   const [quickMode, setQuickMode] = useState<'entree' | 'sortie'>('entree')
   const [quickVisible, setQuickVisible] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Produit | null>(null)
-  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false)
-
   const debouncedSearch = useDebounced(search, 300, produits.length > 200)
 
   useFocusEffect(
@@ -109,38 +105,13 @@ export default function CatalogueScreen() {
     setQuickVisible(true)
   }
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const confirmBatchDelete = async () => {
-    for (const id of selectedIds) {
-      await removeProduit(id)
-    }
-    setSelectedIds(new Set())
-    setSelectionMode(false)
-    setBatchDeleteConfirm(false)
-  }
-
   const renderItem = ({ item, index }: { item: Produit; index: number }) => (
     <ProductCard
       produit={item}
       index={index}
-      selectionMode={selectionMode}
-      selected={selectedIds.has(item.id)}
       onPress={() =>
         router.push(`/(drawer)/(tabs)/produits/${item.id}` as never)
       }
-      onLongPress={() => {
-        setSelectionMode(true)
-        toggleSelect(item.id)
-      }}
-      onToggleSelect={() => toggleSelect(item.id)}
       onAddStock={() => openQuick(item, 'entree')}
       onEdit={() =>
         router.push({
@@ -154,22 +125,13 @@ export default function CatalogueScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft size={22} color={Colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Catalogue</Text>
-        {selectionMode ? (
-          <Pressable
-            onPress={() => setBatchDeleteConfirm(true)}
-            disabled={selectedIds.size === 0}
-          >
-            <Trash2 size={20} color={selectedIds.size ? Colors.danger : Colors.textTertiary} />
-          </Pressable>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
-      </View>
+        <View style={{ width: 40 }} />
+      </View> */}
 
       <CatalogSearchBar
         expanded={searchExpanded}
@@ -192,10 +154,12 @@ export default function CatalogueScreen() {
         }}
       />
 
-      <MetricCards total={produits.length} alertes={alertes} valeurStock={valeurStock} />
+      {/* <MetricCards total={produits.length} alertes={alertes} valeurStock={valeurStock} /> */}
 
       {isLoading && produits.length === 0 ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={Colors.textPrimary} />
+        <View style={styles.loaderWrap}>
+          <Loader message="Chargement du catalogue…" />
+        </View>
       ) : (
         <FlatList
           data={paginated}
@@ -208,7 +172,7 @@ export default function CatalogueScreen() {
             if (paginated.length < filtered.length) setPage((p) => p + 1)
           }}
           onEndReachedThreshold={0.3}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           ListEmptyComponent={
             <Text style={styles.empty}>Aucun produit trouvé</Text>
           }
@@ -217,24 +181,13 @@ export default function CatalogueScreen() {
 
       <Animated.View
         entering={ZoomIn.duration(300)}
-        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        style={[styles.fab, { bottom: insets.bottom + 24 }]}
       >
         <Pressable
           style={styles.fabBtn}
-          onPress={() => {
-            if (selectionMode) {
-              setSelectionMode(false)
-              setSelectedIds(new Set())
-            } else {
-              router.push('/(drawer)/(tabs)/produits/edit' as never)
-            }
-          }}
+          onPress={() => router.push('/(drawer)/(tabs)/produits/edit' as never)}
         >
-          <Plus
-            size={26}
-            color={Colors.textInverse}
-            style={selectionMode ? { transform: [{ rotate: '45deg' }] } : undefined}
-          />
+          <Plus size={26} color={Colors.textInverse} />
         </Pressable>
       </Animated.View>
 
@@ -264,18 +217,6 @@ export default function CatalogueScreen() {
         onSecondaryPress={() => setDeleteTarget(null)}
       />
 
-      <CustomAlert
-        isVisible={batchDeleteConfirm}
-        onClose={() => setBatchDeleteConfirm(false)}
-        title="Suppression multiple"
-        description={`Supprimer ${selectedIds.size} produit(s) ?`}
-        iconName="AlertTriangle"
-        color={Colors.danger}
-        primaryButtonLabel="Supprimer tout"
-        onPrimaryPress={confirmBatchDelete}
-        secondaryButtonLabel="Annuler"
-        onSecondaryPress={() => setBatchDeleteConfirm(false)}
-      />
     </View>
   )
 }
@@ -297,6 +238,11 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.display,
     fontSize: 20,
     color: Colors.textPrimary,
+  },
+  loaderWrap: {
+    minHeight: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   empty: {
     textAlign: 'center',

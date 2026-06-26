@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "599834592828-b5omdhlb8v2m16r0cpndumts5br0ijoe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.litxx.lotusbusiness",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "599834592828-k4k1eldkssvog42m1aij1e64np27ar69.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

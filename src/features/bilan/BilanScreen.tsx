@@ -1,3 +1,7 @@
+import ChargeFormSheet, {
+  type ChargeFormSheetRef,
+} from "@/components/charges/ChargeFormSheet";
+import ChargesSummaryBlock from "@/components/charges/ChargesSummaryBlock";
 import CustomTopBar from "@/components/customs/customTopBar";
 import PrimaryButton from "@/components/PrimaryButton";
 import Loader from "@/components/ui/loader";
@@ -7,7 +11,8 @@ import { FontFamily, FontSize } from "@/constants/typography";
 import { formatMontant, formatNombre } from "@/lib/utils/formatters";
 import type { BilanDateRange } from "@/types/bilan";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   Alert,
   RefreshControl,
@@ -18,7 +23,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import {
   buildBilanPdfHtml,
   getCompactDateRangeLabel,
@@ -26,25 +30,32 @@ import {
   getShortcutRange,
   persistBilanPdfUri,
 } from "./bilan.service";
-import DateRangePicker from "./components/DateRangePicker";
+import DateRangePicker, {
+  DateRangePickerRef,
+} from "./components/DateRangePicker";
 import InventaireTable from "./components/InventaireTable";
 import SummaryCard from "./components/SummaryCard";
 import { useBilan } from "./useBilan";
+import FullAdCarousel from "@/app/(drawer)/ads/fullAds";
+import { useUiStore } from "@/contexts/useUiStore";
 
 export default function BilanScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarOffset = Layout.tabBarHeight + Layout.tabBarPaddingBottom + 16;
-  const footerPaddingBottom = 18;
   const footerReservedSpace = tabBarOffset + Layout.buttonHeight + 56;
   const [dateRange, setDateRange] = useState<BilanDateRange>(() =>
     getShortcutRange("today"),
   );
-  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  // const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [showAllSorties, setShowAllSorties] = useState(false);
   const [showAllEntrees, setShowAllEntrees] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
-
+  const datePickerRef = useRef<DateRangePickerRef>(null);
+  const chargeFormRef = useRef<ChargeFormSheetRef>(null);
+  const [showCarousel, setShowCarousel] = useState(true);
+  const [isAdCompleted, setIsAdCompleted] = useState(false);
   const {
     data,
     error,
@@ -54,7 +65,27 @@ export default function BilanScreen() {
     isRefreshing,
     reload,
   } = useBilan(dateRange);
+  const handleAdFinish = () => {
+    setIsAdCompleted(true);
+    setShowCarousel(false);
+    console.log(' Carousel ad terminé !');
+  };
+const setAdCarouselActive = useUiStore((s) => s.setAdCarouselActive);
 
+useEffect(() => {
+  setAdCarouselActive(true);
+  return () => setAdCarouselActive(false);
+}, [setAdCarouselActive]);
+  const handleRedirect = () => {
+    console.log(' Redirection vers la page premium !');
+    router.push('/premium');
+  };
+    const adImages = [
+    require('@/assets/ads/ad1.png'),      
+    require('@/assets/ads/ad1.png'),      
+    require('@/assets/ads/ad1.png'),      
+    require('@/assets/ads/ad1.png'), 
+  ];
   const headerDateLabel = useMemo(
     () => getDateRangeLabel(data.range),
     [data.range],
@@ -127,15 +158,15 @@ export default function BilanScreen() {
         <CustomTopBar
           type="bilan"
           date={topBarDateLabel}
-          onPressCalendar={() => setIsDatePickerVisible(true)}
+          onPressCalendar={() => datePickerRef.current?.open()}
         />
         <Loader message="Chargement du bilan..." />
         <DateRangePicker
-          visible={isDatePickerVisible}
+          ref={datePickerRef}
           value={dateRange}
-          onClose={() => setIsDatePickerVisible(false)}
           onChange={handleRangeChange}
         />
+        <ChargeFormSheet ref={chargeFormRef} onSuccess={() => reload(true)} />
       </View>
     );
   }
@@ -162,177 +193,207 @@ export default function BilanScreen() {
           ? ("positive" as const)
           : ("negative" as const),
     },
+    {
+      label: "Bénéfice net",
+      value: formatMontant(data.summary.beneficeNet),
+      helper: "Après charges annexes",
+      tone:
+        data.summary.beneficeNet >= 0
+          ? ("positive" as const)
+          : ("negative" as const),
+    },
   ];
 
   return (
     <View style={styles.screen}>
-      <CustomTopBar
-        type="bilan"
-        date={topBarDateLabel}
-        onPressCalendar={() => setIsDatePickerVisible(true)}
-      />
+      <>
+        <CustomTopBar
+          type="bilan"
+          date={topBarDateLabel}
+          onPressCalendar={() => datePickerRef.current?.open()}
+        />
 
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: footerReservedSpace + insets.bottom },
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => reload(true)}
-            tintColor={Colors.textPrimary}
-          />
-        }
-      >
-        <Animated.View
-          entering={FadeInDown.duration(250)}
-          style={styles.introBlock}
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: footerReservedSpace + insets.bottom },
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => reload(true)}
+              tintColor={Colors.textPrimary}
+            />
+          }
         >
-          <Text style={styles.introTitle} selectable>
-            Bilan du {headerDateLabel}
-          </Text>
-          <Text style={styles.introBody} selectable>
-            Suivez vos ventes, vos entrées et la marge brute sur la période
-            choisie.
-          </Text>
-        </Animated.View>
+          <Animated.View
+            entering={FadeInDown.duration(250)}
+            style={styles.introBlock}
+          >
+            <Text style={styles.introTitle} selectable>
+              Ventes du {headerDateLabel}
+            </Text>
+            <Text style={styles.introBody} selectable>
+              Récapitulatif de vos ventes, vos entrées et la marge brute sur la
+              période choisie.
+            </Text>
+          </Animated.View>
 
-        {error ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorTitle} selectable>
-              Chargement incomplet
-            </Text>
-            <Text style={styles.errorBody} selectable>
-              {error}
-            </Text>
+          {error ? (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorTitle} selectable>
+                Chargement incomplet
+              </Text>
+              <Text style={styles.errorBody} selectable>
+                {error}
+              </Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => reload()}
+                activeOpacity={0.82}
+              >
+                <Text style={styles.retryLabel} selectable>
+                  Réessayer
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {hasMovements ? (
+            <Animated.View
+              entering={FadeInDown.duration(250).delay(40)}
+              style={styles.summaryGrid}
+            >
+              {summaryCards.map((card) => (
+                <SummaryCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  helper={card.helper}
+                  tone={card.tone}
+                />
+              ))}
+            </Animated.View>
+          ) : null}
+
+          <Animated.View
+            entering={FadeInDown.duration(250).delay(30)}
+            style={styles.chargeActions}
+          >
             <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => reload()}
+              style={styles.addChargeButton}
+              onPress={() => chargeFormRef.current?.open()}
               activeOpacity={0.82}
             >
-              <Text style={styles.retryLabel} selectable>
-                Réessayer
+              <Text style={styles.addChargeLabel} selectable>
+                Ajouter
               </Text>
             </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {hasMovements ? (
-          <Animated.View
-            entering={FadeInDown.duration(250).delay(40)}
-            style={styles.summaryGrid}
-          >
-            {summaryCards.map((card, index) => (
-              <SummaryCard
-                key={card.label}
-                label={card.label}
-                value={card.value}
-                helper={card.helper}
-                tone={card.tone}
-                fullWidth={index === 2}
-              />
-            ))}
+            <TouchableOpacity
+              style={styles.historyChargeButton}
+              onPress={() =>
+                router.replace("/(drawer)/screens/Charges/history")
+              }
+              activeOpacity={0.82}
+            >
+              <Text style={styles.addChargeLabel} selectable>
+                Historique
+              </Text>
+            </TouchableOpacity>
           </Animated.View>
-        ) : null}
+          {data.summary.totalCharges > 0 ? (
+            <Animated.View entering={FadeInDown.duration(250).delay(60)}>
+              <ChargesSummaryBlock
+                total={data.summary.totalCharges}
+                parCategorie={data.summary.chargesParCategorie}
+              />
+            </Animated.View>
+          ) : null}
 
-        <Animated.View
-          entering={FadeInDown.duration(250).delay(80)}
-          style={styles.sectionWrap}
-        >
-          <InventaireTable
-            title="Inventaire sorties"
-            rows={data.sorties}
-            emptyMessage="Aucune vente enregistrée sur cette période."
-            expanded={showAllSorties}
-            onToggleExpanded={() => setShowAllSorties((current) => !current)}
-          />
-        </Animated.View>
-
-        {hasEntrees ? (
           <Animated.View
-            entering={FadeInDown.duration(250).delay(120)}
+            entering={FadeInDown.duration(250).delay(80)}
             style={styles.sectionWrap}
           >
             <InventaireTable
-              title="Inventaire entrées"
-              rows={data.entrees}
-              expanded={showAllEntrees}
-              onToggleExpanded={() => setShowAllEntrees((current) => !current)}
-              hideWhenEmpty
+              title="Inventaire sorties"
+              rows={data.sorties}
+              emptyMessage="Aucune vente enregistrée sur cette période."
+              expanded={showAllSorties}
+              onToggleExpanded={() => setShowAllSorties((current) => !current)}
             />
-            <Text style={styles.entryNote} selectable>
-              Les entrées sont valorisées avec le prix unitaire actuellement
-              porté par le produit, faute de prix d&apos;achat historisé dans
-              SQLite.
-            </Text>
           </Animated.View>
-        ) : null}
 
-        {!hasMovements ? (
-          <Animated.View
-            entering={FadeInDown.duration(250).delay(100)}
-            style={styles.emptyCard}
-          >
-            <Text style={styles.emptyTitle} selectable>
-              Aucun mouvement sur cette période
-            </Text>
-            <Text style={styles.emptyBody} selectable>
-              Les cartes de synthèse et l&apos;export PDF restent désactivés tant
-              qu&apos;aucune vente ou entrée n&apos;existe sur la période choisie.
-            </Text>
-          </Animated.View>
-        ) : null}
-      </ScrollView>
+          {hasEntrees ? (
+            <Animated.View
+              entering={FadeInDown.duration(250).delay(120)}
+              style={styles.sectionWrap}
+            >
+              <InventaireTable
+                title="Inventaire entrées"
+                rows={data.entrees}
+                expanded={showAllEntrees}
+                onToggleExpanded={() =>
+                  setShowAllEntrees((current) => !current)
+                }
+                hideWhenEmpty
+              />
+              <Text style={styles.entryNote} selectable>
+                Les entrées sont valorisées avec le prix unitaire actuellement
+                porté par le produit, faute de prix d&apos;achat historisé dans
+                SQLite.
+              </Text>
+            </Animated.View>
+          ) : null}
 
-      <View
-        style={[
-          styles.footer,
-          {
-            bottom: tabBarOffset + insets.bottom,
-            paddingBottom: footerPaddingBottom,
-          },
-        ]}
-      >
-        <PrimaryButton
-          label={
-            hasExportableData
-              ? isExporting
-                ? "GÉNÉRATION EN COURS..."
-                : "GÉNÉRER LE BILAN PDF"
-              : "GÉNÉRER LE BILAN PDF"
-          }
-          onPress={() => void handleExportPdf()}
-          disabled={!hasExportableData || isExporting || isPrinting}
+          {!hasMovements ? (
+            <Animated.View
+              entering={FadeInDown.duration(250).delay(100)}
+              style={styles.emptyCard}
+            >
+              <Text style={styles.emptyTitle} selectable>
+                Aucun mouvement sur cette période
+              </Text>
+              <Text style={styles.emptyBody} selectable>
+                Les cartes de synthèse et l&apos;export PDF restent désactivés
+                tant qu&apos;aucune vente ou entrée n&apos;existe sur la période
+                choisie.
+              </Text>
+            </Animated.View>
+          ) : null}
+
+          <View>
+            {hasExportableData ? (
+              <PrimaryButton
+                label={isPrinting ? "Ouverture..." : "Imprimer le bilan"}
+                onPress={() => void handlePrintBilan()}
+                disabled={isExporting || isPrinting}
+              />
+            ) : (
+              <Text style={styles.footerHint} selectable>
+                Sélectionnez une période avec au moins une vente ou une entrée
+                pour activer l&apos;export.
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+
+        <DateRangePicker
+          ref={datePickerRef}
+          value={dateRange}
+          onChange={handleRangeChange}
         />
-
-        {hasExportableData ? (
-          <TouchableOpacity
-            style={styles.printButton}
-            onPress={() => void handlePrintBilan()}
-            activeOpacity={0.82}
-            disabled={isExporting || isPrinting}
-          >
-            <Text style={styles.printButtonLabel} selectable>
-              {isPrinting ? "Ouverture..." : "Imprimer le bilan"}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <Text style={styles.footerHint} selectable>
-            Sélectionnez une période avec au moins une vente ou une entrée pour
-            activer l&apos;export.
-          </Text>
-        )}
-      </View>
-
-      <DateRangePicker
-        visible={isDatePickerVisible}
-        value={dateRange}
-        onClose={() => setIsDatePickerVisible(false)}
-        onChange={handleRangeChange}
-      />
+        <ChargeFormSheet ref={chargeFormRef} onSuccess={() => reload(true)} />
+                {showCarousel && (
+        <FullAdCarousel
+          onFinish={handleAdFinish}
+          images={adImages}
+          redirectPath="/premium"
+          onRedirect={handleRedirect}
+        />
+      )}
+      </>
     </View>
   );
 }
@@ -341,7 +402,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingTop: 30,
+    paddingTop: 50,
   },
   content: {
     paddingHorizontal: 10,
@@ -351,7 +412,7 @@ const styles = StyleSheet.create({
   introBlock: {
     gap: 6,
     paddingTop: 4,
-    paddingHorizontal: 2,
+    paddingHorizontal: 5,
   },
   introTitle: {
     fontFamily: FontFamily.displaySemi,
@@ -398,10 +459,47 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.dangerText,
   },
+  chargeActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 5,
+  },
+  addChargeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 16,
+  },
+  historyChargeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    paddingHorizontal: 16,
+  },
+  addChargeLabel: {
+    fontFamily: FontFamily.utilityBold,
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
+  },
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+    alignItems: "flex-start",
   },
   sectionWrap: {
     gap: 10,
@@ -414,10 +512,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   emptyCard: {
-    padding: 22,
-    borderRadius: 28,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
+    padding: 30,
     borderColor: Colors.border,
     gap: 10,
   },
@@ -431,19 +526,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     lineHeight: 22,
     color: Colors.textSecondary,
-  },
-  footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    marginHorizontal: 16,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 10,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.98)",
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   printButton: {
     alignItems: "center",

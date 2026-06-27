@@ -1,4 +1,4 @@
-// app/components/FullAdCarousel.tsx
+// src/components/ads/fullAds.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -85,23 +85,19 @@ const FullAdCarousel: React.FC<FullAdCarouselProps> = ({
   }, [images.length]);
 
   const handleAdPress = () => {
-    if (countdown > 0) {
-      // Redirection avant la fin du compte à rebours
-      if (onRedirect) {
-        onRedirect();
-      } else if (redirectPath) {
-        router.push(redirectPath as any);
-      }
-      
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsVisible(false);
-        onFinish();
-      });
+    router.push("/premium");
+    if (onRedirect) {
+      onRedirect();
     }
+    
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVisible(false);
+      onFinish();
+    });
   };
 
   const handleClose = () => {
@@ -153,22 +149,11 @@ const FullAdCarousel: React.FC<FullAdCarouselProps> = ({
               onPress={handleClose}
               activeOpacity={0.7}
             >
-              <X size={24} color="#FFFFFF" />
+              <X size={18} color="#FFFFFF" />
+            <Text style={styles.closeButtonText}>Fermer</Text>
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Bouton Close en bas (optionnel) */}
-        {canClose && (
-          <TouchableOpacity
-            style={styles.closeButtonBottom}
-            onPress={handleClose}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.closeButtonText}>Fermer ✕</Text>
-          </TouchableOpacity>
-        )}
-
         {/* Indicateurs de slide */}
         <View style={styles.dotsContainer}>
           {images.map((_, index) => (
@@ -225,9 +210,10 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 80,
+    height: 40,
+    borderRadius: 20,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -247,7 +233,7 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
   },
   dotsContainer: {

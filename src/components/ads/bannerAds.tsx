@@ -1,4 +1,4 @@
-// app/components/BannerAdsWithProgress.tsx
+// src/components/ads/bannerAds.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   FlatList,
   Animated,
-  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 
@@ -44,7 +43,7 @@ const BannerAdsWithProgress: React.FC<BannerAdsWithProgressProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
-    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Animation de progression
   useEffect(() => {
@@ -79,10 +78,9 @@ const BannerAdsWithProgress: React.FC<BannerAdsWithProgressProps> = ({
   };
 
   const handleBannerPress = () => {
+    router.push("/premium");
     if (onBannerPress) {
       onBannerPress();
-    } else {
-      router.push(redirectPath as any);
     }
   };
 
@@ -168,18 +166,6 @@ const styles = StyleSheet.create({
     width: width - 32,
     height: 180,
     overflow: 'hidden',
-    // backgroundColor: '#f5f5f5',
-    // ...Platform.select({
-    //   ios: {
-    //     shadowColor: '#000',
-    //     shadowOffset: { width: 0, height: 2 },
-    //     shadowOpacity: 0.1,
-    //     shadowRadius: 8,
-    //   },
-    //   android: {
-    //     elevation: 4,
-    //   },
-    // }),
   },
   bannerImage: {
     width: '100%',

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -18,14 +18,15 @@ import { FontFamily } from "@/constants/typography";
 import { useStockStore } from "@/store/useStockStore";
 import CatalogPreview from "@/features/produits/catalog-preview";
 import HomeFab from "@/components/customs/HomeFab";
-import AdsOverlay from "@/app/(drawer)/ads/adsOverlays";
+import AdsOverlay from "@/components/ads/adsOverlays";
 import AdsImage from "@/assets/ads/ad4.png";
-import BannerAdsWithProgress from "../ads/bannerAds";
+import BannerAdsWithProgress from "@/components/ads/bannerAds";
 import {
   bannerImages,
   bannerImagesRemote,
   bannerImagesMix,
-} from "../ads/bannerData";
+} from "@/components/ads/bannerData";
+import { useUiStore } from "@/contexts/useUiStore";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function HomeScreen() {
   const produits = useStockStore((state) => state.produits);
   const [showAds, setShowAds] = useState(true);
   const [isAdsCompleted, setIsAdsCompleted] = useState(false);
+  const setAdOverlayActive = useUiStore((state) => state.setAdOverlayActive);
   const handleBannerPress = () => {
     console.log("Banner pressé !");
   };
@@ -53,6 +55,11 @@ export default function HomeScreen() {
       loadProduits();
     }, [loadProduits]),
   );
+
+  useEffect(() => {
+    setAdOverlayActive(showAds);
+    return () => setAdOverlayActive(false);
+  }, [showAds, setAdOverlayActive]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

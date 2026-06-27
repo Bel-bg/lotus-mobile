@@ -1,4 +1,4 @@
-// app/components/AdsOverlay.tsx
+// src/components/ads/adsOverlays.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -93,32 +93,26 @@ const AdsOverlay: React.FC<AdsOverlayProps> = ({
   };
 
   const handleAdPress = () => {
-    if (!canClose) {
-      // Redirection avant la fin du compte à rebours timerRef
-      if (onRedirect) {
-        onRedirect();
-      } else if (redirectPath) {
-        // Navigation avec Expo Router
-        router.push(redirectPath as any);
-      }
-      
-      // Fermer l'overlay
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 0.8,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setIsVisible(false);
-        onFinish();
-      });
+    router.push("/premium");
+    if (onRedirect) {
+      onRedirect();
     }
+    
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.8,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsVisible(false);
+      onFinish();
+    });
   };
 
   if (!isVisible) return null;
@@ -185,7 +179,7 @@ const styles = StyleSheet.create({
   },
   background: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   contentContainer: {
     alignItems: 'center',
@@ -193,10 +187,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   adImage: {
-    width: width * 0.6,
-    height: height * 0.4,
+    width: width * 0.8,
+    height: height * 0.6,
     borderRadius: 15,
-    marginBottom: 30,
+    marginBottom: 10,
   },
   timerContainer: {
     alignItems: 'center',

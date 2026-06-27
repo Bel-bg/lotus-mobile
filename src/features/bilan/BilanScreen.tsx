@@ -11,7 +11,7 @@ import { FontFamily, FontSize } from "@/constants/typography";
 import { formatMontant, formatNombre } from "@/lib/utils/formatters";
 import type { BilanDateRange } from "@/types/bilan";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   Alert,
@@ -36,7 +36,7 @@ import DateRangePicker, {
 import InventaireTable from "./components/InventaireTable";
 import SummaryCard from "./components/SummaryCard";
 import { useBilan } from "./useBilan";
-import FullAdCarousel from "@/app/(drawer)/ads/fullAds";
+import FullAdCarousel from "@/components/ads/fullAds";
 import { useUiStore } from "@/contexts/useUiStore";
 
 export default function BilanScreen() {
@@ -56,6 +56,7 @@ export default function BilanScreen() {
   const chargeFormRef = useRef<ChargeFormSheetRef>(null);
   const [showCarousel, setShowCarousel] = useState(true);
   const [isAdCompleted, setIsAdCompleted] = useState(false);
+  const setAdOverlayActive = useUiStore((state) => state.setAdOverlayActive);
   const {
     data,
     error,
@@ -68,24 +69,25 @@ export default function BilanScreen() {
   const handleAdFinish = () => {
     setIsAdCompleted(true);
     setShowCarousel(false);
-    console.log(' Carousel ad terminé !');
+    console.log("Carousel ad terminé !");
   };
-const setAdCarouselActive = useUiStore((s) => s.setAdCarouselActive);
 
-useEffect(() => {
-  setAdCarouselActive(true);
-  return () => setAdCarouselActive(false);
-}, [setAdCarouselActive]);
+  useEffect(() => {
+    setAdOverlayActive(showCarousel);
+    return () => setAdOverlayActive(false);
+  }, [showCarousel, setAdOverlayActive]);
+
   const handleRedirect = () => {
-    console.log(' Redirection vers la page premium !');
-    router.push('/premium');
+    console.log(" Redirection vers la page premium !");
+    router.push("/premium");
   };
-    const adImages = [
-    require('@/assets/ads/ad1.png'),      
-    require('@/assets/ads/ad1.png'),      
-    require('@/assets/ads/ad1.png'),      
-    require('@/assets/ads/ad1.png'), 
-  ];
+const adImages = [
+  { uri: 'https://i.pinimg.com/1200x/ba/c4/96/bac4969c7ff1026d609b4556c7784c06.jpg' },
+  { uri: 'https://i.pinimg.com/1200x/68/f2/da/68f2da1b15939683c9b8d4781829d3a6.jpg' },
+  { uri: 'https://i.pinimg.com/736x/ba/0b/13/ba0b133fcc329015d1e7b271eb4dd443.jpg' },
+  { uri: 'https://i.pinimg.com/1200x/06/dc/75/06dc75f010cc6fcd730fb689ee1a69a4.jpg' },
+];
+
   const headerDateLabel = useMemo(
     () => getDateRangeLabel(data.range),
     [data.range],
@@ -385,14 +387,14 @@ useEffect(() => {
           onChange={handleRangeChange}
         />
         <ChargeFormSheet ref={chargeFormRef} onSuccess={() => reload(true)} />
-                {showCarousel && (
-        <FullAdCarousel
-          onFinish={handleAdFinish}
-          images={adImages}
-          redirectPath="/premium"
-          onRedirect={handleRedirect}
-        />
-      )}
+        {showCarousel && (
+          <FullAdCarousel
+            onFinish={handleAdFinish}
+            images={adImages}
+            redirectPath="/premium"
+            onRedirect={handleRedirect}
+          />
+        )}
       </>
     </View>
   );

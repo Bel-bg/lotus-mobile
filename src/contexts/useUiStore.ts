@@ -1,8 +1,11 @@
 import { create } from "zustand";
 
-export const useUiStore = create((set: (arg0: {
-  setAdCarouselActive: any; isAdCarouselActive: boolean; 
-}) => any) => ({
-  isAdCarouselActive: false,
-  setAdCarouselActive: (value: boolean) => set({ isAdCarouselActive: value }),
+type UiState = {
+  isAdOverlayActive: boolean;
+  setAdOverlayActive: (value: boolean) => void;
+};
+
+export const useUiStore = create<UiState>((set) => ({
+  isAdOverlayActive: false,
+  setAdOverlayActive: (value) => set({ isAdOverlayActive: value }),
 }));

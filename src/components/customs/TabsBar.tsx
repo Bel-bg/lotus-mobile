@@ -1,4 +1,9 @@
-import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+export interface BottomTabBarProps {
+  state: any;
+  descriptors?: any;
+  navigation: any;
+  insets?: any;
+}
 import { useRouter } from "expo-router";
 import { BlurView } from "expo-blur";
 import React, { useEffect } from "react";
@@ -73,18 +78,17 @@ export default function TabsBar({
 
   const currentRoute = state.routes[state.index].name;
 
-  const visibleRoutes = state.routes.filter((route: { name: string }) =>
-    VISIBLE_TABS.includes(route.name as (typeof VISIBLE_TABS)[number]),
-  );
-
   const hideTabBar =
     currentRoute.startsWith("ventes/") ||
     currentRoute === "profil/index" ||
     currentRoute === "produits" ||
     currentRoute.includes("produits/");
-const isAdCarouselActive = useUiStore((s) => s.isAdCarouselActive);
+  const isAdOverlayActive = useUiStore((s) => s.isAdOverlayActive);
 
-if (hideTabBar || isAdCarouselActive) return null;y
+  const visibleRoutes = state.routes.filter((route: { name: string }) =>
+    VISIBLE_TABS.includes(route.name as (typeof VISIBLE_TABS)[number]),
+  );
+
   // Index actif parmi les 4 tabs visibles
   const activeVisibleIndex = visibleRoutes.findIndex(
     (r: { key: any }) => r.key === state.routes[state.index]?.key,
@@ -113,7 +117,7 @@ if (hideTabBar || isAdCarouselActive) return null;y
     transform: [{ translateX: pillX.value }],
   }));
 
-  if (hideTabBar) return null;
+  if (hideTabBar || isAdOverlayActive) return null;
 
   return (
     // Wrapper positionné en absolute tout en bas
@@ -158,7 +162,7 @@ if (hideTabBar || isAdCarouselActive) return null;y
                   const onPress = () => {
                     const event = navigation.emit({
                       type: "tabPress",
-                      target: route.key,
+                      target: String(route.key),
                       canPreventDefault: true,
                     });
                     if (!isFocused && !event.defaultPrevented) {
@@ -217,7 +221,7 @@ if (hideTabBar || isAdCarouselActive) return null;y
                   const onPress = () => {
                     const event = navigation.emit({
                       type: "tabPress",
-                      target: route.key,
+                      target: String(route.key),
                       canPreventDefault: true,
                     });
                     if (!isFocused && !event.defaultPrevented) {
@@ -270,16 +274,16 @@ if (hideTabBar || isAdCarouselActive) return null;y
 }
 
 const styles = StyleSheet.create({
-wrapper: {
-  position: "absolute",
-  bottom: 0,
-  left: 0,
-  right: 0,
-  paddingHorizontal: H_PADDING,
-  paddingTop: 8,
-  alignItems: "center",
-  zIndex: 1,
-},
+  wrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: H_PADDING,
+    paddingTop: 8,
+    alignItems: "center",
+    zIndex: 1,
+  },
   floatingContainer: {
     width: "100%",
     borderRadius: 26,

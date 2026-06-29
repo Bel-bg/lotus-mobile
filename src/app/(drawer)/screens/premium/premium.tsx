@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { X, Check } from "lucide-react-native";
+import { X, Check, ArrowLeft } from "lucide-react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
@@ -42,7 +42,7 @@ const COMPARISON_FEATURES: FeatureRow[] = [
 ];
 
 const PRO_COL_WIDTH = 72;
-const ACCENT = Colors.info; // #2563EB
+const ACCENT = Colors.textPrimary; // #2563EB
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ export default function PremiumScreen() {
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <X size={20} color={Colors.textPrimary} />
+          <ArrowLeft size={20} color={Colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -162,9 +162,7 @@ export default function PremiumScreen() {
             </Text>
           </Text>
         </Animated.View>
-      </ScrollView>
 
-      {/* ── Footer fixe ── */}
       <View
         style={[
           styles.footer,
@@ -184,6 +182,8 @@ export default function PremiumScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      </ScrollView>
     </View>
   );
 }
@@ -315,8 +315,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.utilityBold,
     color: Colors.textPrimary,
   },
-
-  // Footer
   footer: {
     position: "absolute",
     bottom: 0,
@@ -327,17 +325,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing[4],
     borderTopWidth: 1,
     borderTopColor: Colors.overlayLight,
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
   },
   primaryButton: {
     width: "100%",

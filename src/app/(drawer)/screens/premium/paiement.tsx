@@ -1,5 +1,5 @@
 // ============================================
-// LOTUS BUSINESS — Écran Paiement Premium
+// LOTUS BUSINESS — Écran Paiement Premium (v3)
 // ============================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import {
   Alert,
   Platform,
   Image,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -23,96 +24,64 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  withDelay,
   Easing,
 } from "react-native-reanimated";
-import { ArrowLeft, CheckCircle2, Zap } from "lucide-react-native";
+import { ArrowLeft, Zap } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
-import { Radius, Spacing, Shadow } from "@/constants/layout";
+import { Radius, Spacing } from "@/constants/layout";
 import { useAuthStore } from "@/store/useAuthStore";
 import PromoTrialOverlay from "@/components/premium/PromoTrialOverlay";
 import GiftImage from "@/assets/images/gift.png";
+import MoovLogo   from "@/assets/images/moov.png";
+import MtnLogo    from "@/assets/images/momo.png";
+import CeltisLogo from "@/assets/images/celtis.png";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const ACCENT = Colors.info;
-const PROMO_DELAY_MS = 4000; // L'overlay promo s'affiche après 4 secondes
+const PROMO_DELAY_MS = 4000;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-type Plan = "mensuel" | "annuel";
-type Operator = "moov" | "mtn" | null;
+type Plan     = "mensuel" | "annuel";
+type Operator = "moov" | "mtn" | "celtis" | null;
 
-interface PlanConfig {
-  id: Plan;
-  label: string;
-  prix: string;
-  prixNum: number;
-  periode: string;
-  badge?: string;
-  badgeColor?: string;
+interface OperatorConfig {
+  id: Operator;
+  name: string;
+  logo: ReturnType<typeof require>;
 }
 
-const PLANS: PlanConfig[] = [
-  {
-    id: "mensuel",
-    label: "Mensuel",
-    prix: "999",
-    prixNum: 999,
-    periode: "/ mois",
-  },
-  {
-    id: "annuel",
-    label: "Annuel",
-    prix: "10 000",
-    prixNum: 10000,
-    periode: "/ an",
-    badge: "-17%",
-    badgeColor: Colors.success,
-  },
+const OPERATORS: OperatorConfig[] = [
+  { id: "moov",   name: "Moov Money",       logo: MoovLogo   },
+  { id: "mtn",    name: "MTN Mobile Money",  logo: MtnLogo    },
+  { id: "celtis", name: "Celtis Cash",       logo: CeltisLogo },
 ];
 
-// ─── Composant OperatorCard ───────────────────────────────────────────────────
+// ─── OperatorRow ──────────────────────────────────────────────────────────────
 
-interface OperatorCardProps {
-  name: string;
-  subtitle: string;
-  color: string;
-  emoji: string;
-  selected: boolean;
-  onPress: () => void;
-}
-
-function OperatorCard({
-  name,
-  subtitle,
-  color,
-  emoji,
+function OperatorRow({
+  config,
   selected,
   onPress,
-}: OperatorCardProps) {
+  isLast,
+}: {
+  config: OperatorConfig;
+  selected: boolean;
+  onPress: () => void;
+  isLast: boolean;
+}) {
   return (
     <TouchableOpacity
-      style={[
-        styles.operatorCard,
-        selected && { borderColor: color, borderWidth: 2 },
-      ]}
+      style={[styles.operatorRow, !isLast && styles.operatorRowDivider]}
       onPress={onPress}
-      activeOpacity={0.82}
+      activeOpacity={0.7}
     >
-      {/* Cercle coloré avec emoji */}
-      <View style={[styles.operatorIconCircle, { backgroundColor: color + "22" }]}>
-        <Text style={styles.operatorEmoji}>{emoji}</Text>
-      </View>
-
-      <View style={styles.operatorInfo}>
-        <Text style={styles.operatorName}>{name}</Text>
-        <Text style={styles.operatorSub}>{subtitle}</Text>
-      </View>
-
-      {/* Radio */}
-      <View style={[styles.radio, selected && { borderColor: color }]}>
-        {selected && (
-          <View style={[styles.radioDot, { backgroundColor: color }]} />
-        )}
+      <Image source={config.logo} style={styles.operatorLogo} resizeMode="contain" />
+      <Text style={styles.operatorName}>{config.name}</Text>
+      <View style={[styles.radio, selected && { borderColor: ACCENT }]}>
+        {selected && <View style={styles.radioDot} />}
       </View>
     </TouchableOpacity>
   );
@@ -121,127 +90,112 @@ function OperatorCard({
 // ─── Composant Principal ──────────────────────────────────────────────────────
 
 export default function PaiementScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const email = useAuthStore((state) => state.email);
-  const setLicence = useAuthStore((state) => state.setLicence);
+  const router     = useRouter();
+  const insets     = useSafeAreaInsets();
+  const email      = useAuthStore((s) => s.email);
+  const setLicence = useAuthStore((s) => s.setLicence);
 
-  const [selectedPlan, setSelectedPlan] = useState<Plan>("mensuel");
+  const [selectedPlan,     setSelectedPlan]     = useState<Plan>("annuel");
   const [selectedOperator, setSelectedOperator] = useState<Operator>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showPromo, setShowPromo] = useState(false);
-  const [promoShownOnce, setPromoShownOnce] = useState(false);
+  const [isProcessing,     setIsProcessing]     = useState(false);
+  const [showPromo,        setShowPromo]        = useState(false);
 
+  const planScrollRef = useRef<ScrollView>(null);
   const promoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Animation lueur du bouton persistant ─────────────────────────────────
-  const glowScale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0.55);
+  // ── Animation débattement FAB ─────────────────────────────────────────────
+  // Mouvement gauche-droite à intervalle constant, comme une notification
+  const fabX = useSharedValue(0);
 
   useEffect(() => {
-    glowScale.value = withRepeat(
-      withSequence(
-        withTiming(1.18, { duration: 900, easing: Easing.out(Easing.ease) }),
-        withTiming(1,    { duration: 900, easing: Easing.in(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.9, { duration: 900 }),
-        withTiming(0.4, { duration: 900 })
-      ),
-      -1,
-      false
-    );
+    const shake = () => {
+      fabX.value = withSequence(
+        withTiming(-7,  { duration: 80,  easing: Easing.out(Easing.ease) }),
+        withTiming( 7,  { duration: 80,  easing: Easing.inOut(Easing.ease) }),
+        withTiming(-5,  { duration: 70,  easing: Easing.inOut(Easing.ease) }),
+        withTiming( 5,  { duration: 70,  easing: Easing.inOut(Easing.ease) }),
+        withTiming(-3,  { duration: 60,  easing: Easing.inOut(Easing.ease) }),
+        withTiming( 0,  { duration: 60,  easing: Easing.in(Easing.ease)   }),
+      );
+    };
+
+    // Premier shake après 1.2s, puis toutes les 3.5s
+    const initial = setTimeout(() => {
+      shake();
+      const interval = setInterval(shake, 3500);
+      return () => clearInterval(interval);
+    }, 1200);
+
+    return () => clearTimeout(initial);
   }, []);
 
-  const glowRingStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: glowScale.value }],
-    opacity: glowOpacity.value,
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: fabX.value }],
   }));
 
-  const handleReopenPromo = () => {
-    setShowPromo(true);
-  };
-
-  // Lancer l'overlay promo après PROMO_DELAY_MS (une seule fois)
+  // ── Timer promo ──────────────────────────────────────────────────────────
   useEffect(() => {
-    promoTimerRef.current = setTimeout(() => {
-      setShowPromo(true);
-      setPromoShownOnce(true);
-    }, PROMO_DELAY_MS);
-
-    return () => {
-      if (promoTimerRef.current) {
-        clearTimeout(promoTimerRef.current);
-      }
-    };
+    promoTimerRef.current = setTimeout(() => setShowPromo(true), PROMO_DELAY_MS);
+    return () => { if (promoTimerRef.current) clearTimeout(promoTimerRef.current); };
   }, []);
 
-  const currentPlan = PLANS.find((p) => p.id === selectedPlan)!;
+  // ── Switch plan + scroll ──────────────────────────────────────────────────
+  const switchPlan = (plan: Plan) => {
+    setSelectedPlan(plan);
+    planScrollRef.current?.scrollTo({
+      x: plan === "annuel" ? SCREEN_WIDTH - Spacing[5] * 2 : 0,
+      animated: true,
+    });
+  };
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-
-  const computeExpiration = (months: number): string => {
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const computeExpiration = (months: number) => {
     const d = new Date();
     d.setMonth(d.getMonth() + months);
     return d.toISOString();
   };
 
+  const currentPrix    = selectedPlan === "mensuel" ? "999"    : "10 000";
+  const currentPeriode = selectedPlan === "mensuel" ? "/ mois" : "/ an";
+
   const activateLicence = (trialMonths?: number) => {
     const months = trialMonths ?? (selectedPlan === "mensuel" ? 1 : 12);
     setLicence("actif", {
-      email: email || "client@lotusbusiness.app",
-      statut: "actif",
-      type: "premium",
-      dateCreation: new Date().toISOString(),
+      email:          email || "client@lotusbusiness.app",
+      statut:         "actif",
+      type:           "premium",
+      dateCreation:   new Date().toISOString(),
       dateExpiration: computeExpiration(months),
       nom:
         trialMonths != null
           ? "Essai gratuit (2 mois)"
-          : `Plan ${selectedPlan} — ${currentPlan.prix} FCFA`,
+          : `Plan ${selectedPlan} — ${currentPrix} FCFA`,
     });
   };
 
-  // ── Paiement normal ───────────────────────────────────────────────────────
-
+  // ── Paiement ─────────────────────────────────────────────────────────────
   const handlePay = () => {
     if (!selectedOperator) {
-      Alert.alert(
-        "Opérateur requis",
-        "Veuillez sélectionner Moov Money ou MTN MoMo pour continuer.",
-        [{ text: "OK" }]
-      );
+      Alert.alert("Opérateur requis", "Sélectionnez un mode de paiement pour continuer.", [{ text: "OK" }]);
       return;
     }
-
-    const operatorLabel =
-      selectedOperator === "moov" ? "Moov Money" : "MTN Mobile Money";
-
+    const opName = OPERATORS.find((o) => o.id === selectedOperator)!.name;
     Alert.alert(
-      `Confirmer le paiement`,
-      `Vous allez payer ${currentPlan.prix} FCFA ${currentPlan.periode} via ${operatorLabel}.\n\nUn SMS de confirmation vous sera envoyé.`,
+      "Confirmer le paiement",
+      `Vous allez payer ${currentPrix} FCFA ${currentPeriode} via ${opName}.\n\nUn SMS de confirmation vous sera envoyé.`,
       [
         { text: "Annuler", style: "cancel" },
         {
           text: "Confirmer",
           onPress: () => {
             setIsProcessing(true);
-            // Simulation d'un délai de traitement paiement
             setTimeout(() => {
               activateLicence();
               setIsProcessing(false);
               Alert.alert(
-                "Paiement réussi ! 🎉",
-                `Votre abonnement Pro ${selectedPlan} est maintenant actif.`,
-                [
-                  {
-                    text: "Accéder à Pro",
-                    onPress: () => router.replace("/(drawer)/(tabs)"),
-                  },
-                ]
+                "Paiement réussi 🎉",
+                `Votre abonnement Pro ${selectedPlan} est actif.`,
+                [{ text: "Accéder à Pro", onPress: () => router.replace("/(drawer)/(tabs)") }]
               );
             }, 1500);
           },
@@ -250,40 +204,24 @@ export default function PaiementScreen() {
     );
   };
 
-  // ── Essai gratuit (depuis l'overlay) ─────────────────────────────────────
-
   const handleAcceptTrial = () => {
     setShowPromo(false);
-    activateLicence(2); // 2 mois gratuits
+    activateLicence(2);
     Alert.alert(
-      "Essai gratuit activé ! 🎁",
-      "Vous bénéficiez de 2 mois offerts. À leur expiration, votre abonnement démarrera automatiquement.",
-      [
-        {
-          text: "Découvrir Pro",
-          onPress: () => router.replace("/(drawer)/(tabs)"),
-        },
-      ]
+      "Essai gratuit activé 🎁",
+      "2 mois offerts. À expiration, votre abonnement démarrera automatiquement.",
+      [{ text: "Découvrir Pro", onPress: () => router.replace("/(drawer)/(tabs)") }]
     );
   };
 
-  const handleDeclineTrial = () => {
-    setShowPromo(false);
-  };
-
-  // ── Rendu ────────────────────────────────────────────────────────────────
+  // ─── Rendu ────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
 
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: Math.max(insets.top, Spacing[4]) },
-        ]}
-      >
+      {/* ── Header ── */}
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing[4]) }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backBtn}
@@ -300,166 +238,173 @@ export default function PaiementScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 120 },
+          { paddingBottom: insets.bottom + 140 },
         ]}
       >
-        {/* ── Sélecteur de plan ── */}
-        <Animated.View entering={FadeInDown.delay(50).duration(400)}>
-          <Text style={styles.sectionLabel}>Votre plan</Text>
-          <View style={styles.planRow}>
-            {PLANS.map((plan) => {
-              const isSelected = selectedPlan === plan.id;
-              return (
-                <TouchableOpacity
-                  key={plan.id}
-                  style={[
-                    styles.planCard,
-                    isSelected && styles.planCardSelected,
-                  ]}
-                  onPress={() => setSelectedPlan(plan.id)}
-                  activeOpacity={0.82}
-                >
-                  {/* Badge réduction */}
-                  {plan.badge && (
-                    <View
-                      style={[
-                        styles.discountBadge,
-                        { backgroundColor: plan.badgeColor + "22" },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.discountBadgeText,
-                          { color: plan.badgeColor },
-                        ]}
-                      >
-                        {plan.badge}
-                      </Text>
-                    </View>
-                  )}
 
-                  {/* Contenu */}
-                  <Text
-                    style={[
-                      styles.planLabel,
-                      isSelected && styles.planLabelSelected,
-                    ]}
-                  >
-                    {plan.label}
-                  </Text>
-                  <View style={styles.planPriceRow}>
-                    <Text
-                      style={[
-                        styles.planPrice,
-                        isSelected && styles.planPriceSelected,
-                      ]}
-                    >
-                      {plan.prix}
-                    </Text>
-                    <Text style={styles.planCurrency}> FCFA</Text>
+        {/* ── Tabs plan ── */}
+        <Animated.View entering={FadeInDown.delay(50).duration(380)}>
+          <Text style={styles.label}>Plan</Text>
+
+          {/* Switcher tabs */}
+          <View style={styles.tabSwitcher}>
+            <TouchableOpacity
+              style={[styles.tab, selectedPlan === "mensuel" && styles.tabActive]}
+              onPress={() => switchPlan("mensuel")}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.tabText, selectedPlan === "mensuel" && styles.tabTextActive]}>
+                Mensuel
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tab, selectedPlan === "annuel" && styles.tabActive]}
+              onPress={() => switchPlan("annuel")}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.tabText, selectedPlan === "annuel" && styles.tabTextActive]}>
+                Annuel
+              </Text>
+              {/* Badge -17% */}
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>-17%</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Zone de contenu scrollable horizontalement */}
+          <ScrollView
+            ref={planScrollRef}
+            horizontal
+            pagingEnabled
+            scrollEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const x = e.nativeEvent.contentOffset.x;
+              setSelectedPlan(x > 50 ? "annuel" : "mensuel");
+            }}
+            // Annuel affiché par défaut
+            contentOffset={{ x: SCREEN_WIDTH - Spacing[5] * 2, y: 0 }}
+          >
+            {/* ── Page Mensuel ── */}
+            <View style={styles.planPage}>
+              <View style={styles.planContent}>
+                {/* Prix */}
+                <View style={styles.priceBlock}>
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceMain}>999</Text>
+                    <Text style={styles.priceCurrency}> FCFA / mois</Text>
                   </View>
-                  <Text style={styles.planPeriode}>{plan.periode}</Text>
+                  <View style={styles.oldPriceRow}>
+                    <Text style={styles.oldPrice}>2 999 FCFA / mois</Text>
+                    <View style={styles.strikeThrough} />
+                  </View>
+                  <Text style={styles.priceSubnote}>
+                    Ancien tarif : 2 999 FCFA / mois
+                  </Text>
+                </View>
+              </View>
+            </View>
 
-                  {isSelected && (
-                    <CheckCircle2
-                      size={18}
-                      color={ACCENT}
-                      style={styles.planCheck}
-                      strokeWidth={2.5}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+            {/* ── Page Annuel ── */}
+            <View style={styles.planPage}>
+              <View style={styles.planContent}>
+                {/* Bandeau promo */}
+                <View style={styles.promoBanner}>
+                  <Text style={styles.promoBannerText}>17% de réduction appliquée</Text>
+                </View>
+
+                {/* Prix */}
+                <View style={styles.priceBlock}>
+                  <View style={styles.priceRow}>
+                    <View style={styles.oldPriceInline}>
+                      <Text style={styles.oldPriceStrike}>12 000</Text>
+                    </View>
+                    <Text style={styles.priceMain}>10 000</Text>
+                    <Text style={styles.priceCurrency}> FCFA / an</Text>
+                  </View>
+                  <Text style={styles.priceSubnote}>
+                    Ancien tarif : 36 000 FCFA / an
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Indicateur de page */}
+          <View style={styles.pageIndicator}>
+            <View style={[styles.dot, selectedPlan === "mensuel" && styles.dotActive]} />
+            <View style={[styles.dot, selectedPlan === "annuel"  && styles.dotActive]} />
           </View>
         </Animated.View>
 
-        {/* ── Sélecteur d'opérateur ── */}
-        <Animated.View
-          entering={FadeInDown.delay(150).duration(400)}
-          style={styles.section}
-        >
-          <Text style={styles.sectionLabel}>Mode de paiement</Text>
-          <View style={styles.operatorsList}>
-            <OperatorCard
-              name="Moov Money"
-              subtitle="Paiement mobile sécurisé"
-              color="#FF6B00"
-              emoji="🟠"
-              selected={selectedOperator === "moov"}
-              onPress={() => setSelectedOperator("moov")}
-            />
-            <OperatorCard
-              name="MTN Mobile Money"
-              subtitle="Paiement mobile sécurisé"
-              color="#FFCC00"
-              emoji="🟡"
-              selected={selectedOperator === "mtn"}
-              onPress={() => setSelectedOperator("mtn")}
-            />
+        {/* ── Opérateurs ── */}
+        <Animated.View entering={FadeInDown.delay(140).duration(380)} style={styles.section}>
+          <Text style={styles.label}>Mode de paiement</Text>
+          <View style={styles.operatorsCard}>
+            {OPERATORS.map((op, idx) => (
+              <OperatorRow
+                key={op.id}
+                config={op}
+                selected={selectedOperator === op.id}
+                onPress={() => setSelectedOperator(op.id)}
+                isLast={idx === OPERATORS.length - 1}
+              />
+            ))}
           </View>
         </Animated.View>
 
         {/* ── Récapitulatif ── */}
-        <Animated.View
-          entering={FadeInDown.delay(250).duration(400)}
-          style={styles.section}
-        >
-          <Text style={styles.sectionLabel}>Récapitulatif</Text>
-          <View style={styles.summaryCard}>
+        <Animated.View entering={FadeInDown.delay(220).duration(380)} style={styles.section}>
+          <Text style={styles.label}>Récapitulatif</Text>
+          <View style={styles.summaryBlock}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryKey}>Plan sélectionné</Text>
+              <Text style={styles.summaryKey}>Plan</Text>
               <Text style={styles.summaryVal}>
-                Pro {currentPlan.label}
+                Pro {selectedPlan === "mensuel" ? "Mensuel" : "Annuel"}
               </Text>
             </View>
-            <View style={[styles.summaryRow, styles.summaryDivider]}>
+            <View style={[styles.summaryRow, styles.divider]}>
               <Text style={styles.summaryKey}>Montant</Text>
-              <Text style={[styles.summaryVal, styles.summaryAmount]}>
-                {currentPlan.prix} FCFA{currentPlan.periode}
+              <Text style={[styles.summaryVal, styles.summaryAccent]}>
+                {currentPrix} FCFA {currentPeriode}
               </Text>
             </View>
             {selectedPlan === "annuel" && (
-              <View style={styles.summaryRow}>
+              <View style={[styles.summaryRow, styles.divider]}>
                 <Text style={styles.summaryKey}>Économies</Text>
                 <Text style={[styles.summaryVal, { color: Colors.success }]}>
-                  -1 988 FCFA / an
+                  −26 000 FCFA / an
                 </Text>
               </View>
             )}
-            <View style={[styles.summaryRow, styles.summaryDivider]}>
-              <Text style={styles.summaryKey}>Opérateur</Text>
+            <View style={[styles.summaryRow, styles.divider]}>
+              <Text style={styles.summaryKey}>Via</Text>
               <Text style={styles.summaryVal}>
-                {selectedOperator === "moov"
-                  ? "Moov Money 🟠"
-                  : selectedOperator === "mtn"
-                  ? "MTN MoMo 🟡"
-                  : "Non sélectionné"}
+                {selectedOperator
+                  ? OPERATORS.find((o) => o.id === selectedOperator)!.name
+                  : "—"}
               </Text>
             </View>
           </View>
         </Animated.View>
 
         {/* ── Note légale ── */}
-        <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+        <Animated.View entering={FadeInDown.delay(290).duration(380)}>
           <Text style={styles.legalNote}>
-            En procédant au paiement, vous acceptez les conditions d&apos;utilisation de Lotus Business. L&apos;abonnement se renouvelle automatiquement. Vous pouvez annuler à tout moment depuis votre profil.
+            En procédant au paiement, vous acceptez les conditions d&apos;utilisation de
+            Lotus Business. L&apos;abonnement se renouvelle automatiquement et peut être
+            annulé à tout moment depuis votre profil.
           </Text>
         </Animated.View>
+
       </ScrollView>
 
       {/* ── Footer ── */}
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: Math.max(insets.bottom, Spacing[4]) },
-        ]}
-      >
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing[4]) }]}>
         <TouchableOpacity
-          style={[
-            styles.payButton,
-            isProcessing && styles.payButtonDisabled,
-          ]}
+          style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
           onPress={handlePay}
           disabled={isProcessing}
           activeOpacity={0.88}
@@ -468,34 +413,30 @@ export default function PaiementScreen() {
             <Text style={styles.payButtonText}>Traitement en cours…</Text>
           ) : (
             <>
-              <Zap size={18} color={Colors.textInverse} strokeWidth={2.5} />
               <Text style={styles.payButtonText}>
-                Payer {currentPlan.prix} FCFA{currentPlan.periode}
+                Payer {currentPrix} FCFA {currentPeriode}
               </Text>
             </>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* ── Bouton persistant Promo (flottant, coin bas-droit) ── */}
-      <View
-        style={styles.promoFabWrap}
-      >
-
+      {/* ── FAB Promo — débattement ── */}
+      <Animated.View style={[styles.promoFabWrap, fabStyle]}>
         <TouchableOpacity
           style={styles.promoFab}
-          onPress={handleReopenPromo}
+          onPress={() => setShowPromo(true)}
           activeOpacity={0.82}
         >
           <Image source={GiftImage} style={styles.promoFabIcon} resizeMode="contain" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* ── Overlay promo ── */}
       <PromoTrialOverlay
         visible={showPromo}
         onAccept={handleAcceptTrial}
-        onDecline={handleDeclineTrial}
+        onDecline={() => setShowPromo(false)}
       />
     </View>
   );
@@ -503,13 +444,15 @@ export default function PaiementScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const PLAN_PAGE_WIDTH = SCREEN_WIDTH - Spacing[5] * 2;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
 
-  // Header
+  // ── Header ───────────────────────────────────────────────────────────────
   header: {
     paddingHorizontal: Spacing[5],
     paddingBottom: Spacing[3],
@@ -517,14 +460,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: Colors.background,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.overlayLight,
+    borderRadius: Radius.md,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -535,142 +477,200 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
-  // Scroll
+  // ── Scroll principal ──────────────────────────────────────────────────────
   scrollContent: {
     paddingHorizontal: Spacing[5],
-    paddingTop: Spacing[5],
-    gap: Spacing[5],
+    paddingTop: Spacing[6],
+    gap: Spacing[6],
   },
-
-  // Section
   section: {},
-  sectionLabel: {
+
+  label: {
     fontFamily: FontFamily.utilityBold,
     fontSize: FontSize.xs,
     color: Colors.textTertiary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
     marginBottom: Spacing[3],
   },
 
-  // Plans
-  planRow: {
+  // ── Tab switcher ──────────────────────────────────────────────────────────
+  tabSwitcher: {
     flexDirection: "row",
-    gap: Spacing[3],
+    justifyContent: "space-around",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    marginBottom: 0,
   },
-  planCard: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: Radius.xl,
-    padding: Spacing[4],
-    backgroundColor: Colors.background,
-    position: "relative",
-    gap: 2,
-    ...Shadow.sm,
+  tab: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: Spacing[3],
+    marginRight: Spacing[6],
+    gap: Spacing[2],
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
-  planCardSelected: {
-    borderColor: ACCENT,
-    borderWidth: 2,
-    backgroundColor: Colors.infoLight,
+  tabActive: {
+    borderBottomColor: ACCENT,
   },
-  discountBadge: {
-    position: "absolute",
-    top: Spacing[2],
-    right: Spacing[2],
+  tabText: {
+    fontFamily: FontFamily.utility,
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+  },
+  tabTextActive: {
+    fontFamily: FontFamily.utilityBold,
+    color: ACCENT,
+  },
+  tabBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: Radius.full,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.success + "1A",
   },
-  discountBadgeText: {
+  tabBadgeText: {
     fontFamily: FontFamily.utilityBold,
     fontSize: 10,
-    letterSpacing: 0.3,
+    color: Colors.success,
   },
-  planLabel: {
-    fontFamily: FontFamily.utility,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    marginBottom: 4,
+
+  // ── Pages horizontales ────────────────────────────────────────────────────
+  planPage: {
+    width: PLAN_PAGE_WIDTH,
   },
-  planLabelSelected: {
-    color: ACCENT,
+  planContent: {
+    paddingTop: Spacing[5],
+    paddingBottom: Spacing[2],
+    gap: Spacing[4],
+  },
+
+  // ── Bandeau promo ─────────────────────────────────────────────────────────
+  promoBanner: {
+    backgroundColor: Colors.success + "14",
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing[3],
+    paddingVertical: Spacing[2],
+    alignSelf: "flex-start",
+  },
+  promoBannerText: {
     fontFamily: FontFamily.utilityBold,
+    fontSize: FontSize.sm,
+    color: Colors.success,
   },
-  planPriceRow: {
+
+  // ── Prix ──────────────────────────────────────────────────────────────────
+  priceBlock: {
+    gap: Spacing[2],
+  },
+  priceRow: {
     flexDirection: "row",
     alignItems: "baseline",
+    gap: 4,
   },
-  planPrice: {
+  oldPriceInline: {
+    position: "relative",
+    justifyContent: "center",
+    marginRight: Spacing[1],
+  },
+  oldPriceStrike: {
+    fontFamily: FontFamily.display,
+    fontSize: FontSize["2xl"],
+    color: Colors.textTertiary,
+    textDecorationLine: "line-through",
+    textDecorationColor: Colors.textTertiary,
+  },
+  priceMain: {
     fontFamily: FontFamily.display,
     fontSize: FontSize["5xl"],
     color: Colors.textPrimary,
-    letterSpacing: -1,
+    letterSpacing: -1.5,
   },
-  planPriceSelected: {
-    color: ACCENT,
-  },
-  planCurrency: {
+  priceCurrency: {
     fontFamily: FontFamily.utility,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.base,
     color: Colors.textSecondary,
+    paddingBottom: 4,
   },
-  planPeriode: {
+  oldPriceRow: {
+    position: "relative",
+    alignSelf: "flex-start",
+  },
+  oldPrice: {
+    fontFamily: FontFamily.content,
+    fontSize: FontSize.sm,
+    color: Colors.textTertiary,
+    textDecorationLine: "line-through",
+    textDecorationColor: Colors.textTertiary,
+  },
+  strikeThrough: {
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: Colors.textTertiary,
+  },
+  priceSubnote: {
     fontFamily: FontFamily.content,
     fontSize: FontSize.xs,
     color: Colors.textTertiary,
-    marginTop: 2,
-  },
-  planCheck: {
-    position: "absolute",
-    bottom: Spacing[3],
-    right: Spacing[3],
+    marginTop: Spacing[1],
   },
 
-  // Operators
-  operatorsList: {
-    gap: Spacing[3],
+  // ── Indicateur de page ────────────────────────────────────────────────────
+  pageIndicator: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: Spacing[4],
   },
-  operatorCard: {
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.border,
+  },
+  dotActive: {
+    backgroundColor: ACCENT,
+    width: 18,
+  },
+
+  // ── Opérateurs ────────────────────────────────────────────────────────────
+  operatorsCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.lg,
+    overflow: "hidden",
+    backgroundColor: Colors.background,
+  },
+  operatorRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing[4],
-    borderRadius: Radius.xl,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing[4],
+    paddingVertical: Spacing[4],
     gap: Spacing[3],
-    ...Shadow.sm,
   },
-  operatorIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: Radius.full,
-    justifyContent: "center",
-    alignItems: "center",
+  operatorRowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
   },
-  operatorEmoji: {
-    fontSize: 24,
-  },
-  operatorInfo: {
-    flex: 1,
+  operatorLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
   },
   operatorName: {
+    flex: 1,
     fontFamily: FontFamily.displaySemi,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.base,
     color: Colors.textPrimary,
-  },
-  operatorSub: {
-    fontFamily: FontFamily.content,
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-    marginTop: 2,
   },
   radio: {
     width: 20,
     height: 20,
-    borderRadius: Radius.full,
-    borderWidth: 2,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: Colors.borderStrong,
     justifyContent: "center",
     alignItems: "center",
@@ -678,16 +678,17 @@ const styles = StyleSheet.create({
   radioDot: {
     width: 10,
     height: 10,
-    borderRadius: Radius.full,
+    borderRadius: 5,
+    backgroundColor: ACCENT,
   },
 
-  // Summary
-  summaryCard: {
+  // ── Récapitulatif ─────────────────────────────────────────────────────────
+  summaryBlock: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
     overflow: "hidden",
+    backgroundColor: Colors.background,
   },
   summaryRow: {
     flexDirection: "row",
@@ -696,8 +697,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing[4],
     paddingVertical: Spacing[3],
   },
-  summaryDivider: {
-    borderTopWidth: 1,
+  divider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
   },
   summaryKey: {
@@ -710,12 +711,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
   },
-  summaryAmount: {
-    fontSize: FontSize.lg,
+  summaryAccent: {
+    fontSize: FontSize.base,
     color: ACCENT,
   },
 
-  // Legal
+  // ── Note légale ───────────────────────────────────────────────────────────
   legalNote: {
     fontFamily: FontFamily.content,
     fontSize: FontSize.xs,
@@ -724,7 +725,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Footer
+  // ── Footer ────────────────────────────────────────────────────────────────
   footer: {
     position: "absolute",
     bottom: 0,
@@ -733,32 +734,32 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     paddingHorizontal: Spacing[5],
     paddingTop: Spacing[4],
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
     ...Platform.select({
       ios: {
         shadowColor: Colors.black,
         shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
       },
-      android: { elevation: 8 },
+      android: { elevation: 6 },
     }),
   },
   payButton: {
     width: "100%",
     backgroundColor: ACCENT,
-    borderRadius: Radius.full,
-    height: 58,
+    borderRadius: Radius.lg,
+    height: 56,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: Spacing[2],
     shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   payButtonDisabled: {
     backgroundColor: Colors.borderStrong,
@@ -771,43 +772,21 @@ const styles = StyleSheet.create({
     color: Colors.textInverse,
   },
 
-  // ── Bouton persistant Promo FAB ──────────────────────────────────────────
+  // ── FAB Promo ─────────────────────────────────────────────────────────────
   promoFabWrap: {
     position: "absolute",
     bottom: 110,
     right: Spacing[4],
-    alignItems: "center",
-    justifyContent: "center",
     zIndex: 20,
-  },
-  promoFabGlow: {
-    position: "absolute",
-    width: 72,
-    height: 72,
-    borderRadius: Radius.full,
-    backgroundColor: "transparent",
-    opacity: 0.55,
   },
   promoFab: {
     width: 62,
     height: 62,
-    borderRadius: Radius.full,
-    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
   },
   promoFabIcon: {
     width: 80,
     height: 80,
   },
-  promoFabText: {
-    fontFamily: FontFamily.utilityBold,
-    fontSize: 8,
-    color: Colors.textInverse,
-    textAlign: "center",
-    letterSpacing: 0.2,
-    lineHeight: 10,
-  },
 });
-

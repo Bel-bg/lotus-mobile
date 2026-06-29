@@ -11,6 +11,8 @@ import {
   Menu,
   TextAlignStart,
   History,
+  Store,
+  StoreIcon,
 } from "lucide-react-native";
 import React from "react";
 import {
@@ -98,17 +100,13 @@ export default function CustomTopBar({
             }}
           >
             <TouchableOpacity onPress={handlePressMenu} activeOpacity={0.7}>
-              {/* <Image
-                source={MenuIcon}
-                style={styles.customIcon}
-                contentFit="contain"
-              /> */}
               <TextAlignStart size={24} />
             </TouchableOpacity>
-            {/* <BluetoothBadge /> */}
+            <TouchableOpacity onPress={handlePressProfile} activeOpacity={0.7}  >
             <StatusBadge />
-            <TouchableOpacity onPress={handlePressBell} activeOpacity={0.7}>
-              <Bell size={24} />
+            </TouchableOpacity>
+            <TouchableOpacity  activeOpacity={0.7}>
+              <Store size={24} />
             </TouchableOpacity>
           </View>
         );

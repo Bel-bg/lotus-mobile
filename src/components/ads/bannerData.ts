@@ -8,7 +8,7 @@ export interface BannerItem {
 export const bannerImages: BannerItem[] = [
   {
     id: '1',
-    image: require('@/assets/ads/ad3.png'),
+    image: require('@/assets/ads/ad5.png'),
   },
   {
     id: '2',
@@ -16,7 +16,7 @@ export const bannerImages: BannerItem[] = [
   },
   {
     id: '3',
-    image: require('@/assets/ads/ad3.png'),
+    image: require('@/assets/ads/ad6.png'),
   },
   {
     id: '4',

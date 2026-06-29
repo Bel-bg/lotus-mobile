@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   Platform,
+  Image,
 } from "react-native";
 import Animated, {
   FadeIn,
@@ -19,15 +20,15 @@ import Animated, {
   SlideInDown,
   SlideOutDown,
 } from "react-native-reanimated";
-import { Gift, X, CheckCircle2 } from "lucide-react-native";
+import { X, CheckCircle2 } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import { FontFamily, FontSize } from "@/constants/typography";
 import { Radius, Spacing, Shadow } from "@/constants/layout";
-
+import Gift from "@/assets/images/gift.png"
 interface PromoTrialOverlayProps {
   visible: boolean;
-  onAccept: () => void;   // Activer l'essai gratuit de 2 mois
-  onDecline: () => void;  // Fermer et payer normalement
+  onAccept: () => void;   
+  onDecline: () => void; 
 }
 
 const PROMO_ITEMS = [
@@ -49,7 +50,7 @@ export default function PromoTrialOverlay({
       statusBarTranslucent
       onRequestClose={onDecline}
     >
-      {/* Fond assombri — tap ferme l'overlay */}
+
       <Animated.View
         entering={FadeIn.duration(300)}
         exiting={FadeOut.duration(250)}
@@ -59,7 +60,7 @@ export default function PromoTrialOverlay({
 
         {/* Carte modale */}
         <Animated.View
-          entering={SlideInDown.springify().damping(18).stiffness(200)}
+          entering={SlideInDown.duration(500)}
           exiting={SlideOutDown.duration(250)}
           style={styles.card}
         >
@@ -73,11 +74,8 @@ export default function PromoTrialOverlay({
             <X size={18} color={Colors.textSecondary} />
           </TouchableOpacity>
 
-          {/* Icône */}
-          <View style={styles.iconWrap}>
-            <Gift size={32} color="#FFFFFF" />
-          </View>
 
+            <Image source={Gift} style={styles.iconWrap} />
           {/* Badge */}
           <View style={styles.badge}>
             <Text style={styles.badgeText}>OFFRE SPÉCIALE 🎁</Text>
@@ -148,7 +146,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.background,
-    borderRadius: Radius["2xl"] + 4,
+    borderRadius: 12,
     paddingHorizontal: Spacing[5],
     paddingTop: Spacing[6],
     paddingBottom: Platform.OS === "ios" ? 36 : Spacing[6],
@@ -163,19 +161,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
   },
   iconWrap: {
-    width: 64,
-    height: 64,
+    width: 120,
+    height: 120,
     borderRadius: Radius.full,
-    backgroundColor: ACCENT,
     justifyContent: "center",
     alignItems: "center",
     marginTop: Spacing[2],
-    ...Shadow.md,
   },
   badge: {
     backgroundColor: "#FFF3CD",

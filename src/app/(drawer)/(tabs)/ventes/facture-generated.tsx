@@ -1,257 +1,215 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { FileText, Printer, CheckCircle, X, Share2, Cloud } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, Image } from 'react-native';
+import { CheckCircle2, WifiOff, AlertCircle, X } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
-import { FontFamily, FontSize } from '@/constants/typography';
+import { FontFamily } from '@/constants/typography';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
+type PrintStatus = 'success' | 'disconnected' | 'failed';
+
+const STATUS_CONFIG = {
+  success: {
+    icon: CheckCircle2,
+    iconColor: '#16A34A',
+    iconBg: '#DCFCE7',
+    title: 'Impression réussie',
+    subtitle: 'La facture a été imprimée avec succès.',
+  },
+  disconnected: {
+    icon: WifiOff,
+    iconColor: '#D97706',
+    iconBg: '#FEF3C7',
+    title: 'Imprimante non connectée',
+    subtitle: 'Vérifiez la connexion Bluetooth ou Wi-Fi\nde votre imprimante.',
+  },
+  failed: {
+    icon: AlertCircle,
+    iconColor: '#DC2626',
+    iconBg: '#FEE2E2',
+    title: 'Impression échouée',
+    subtitle: 'Une erreur est survenue. Réessayez\nou vérifiez votre imprimante.',
+  },
+};
 
 export default function FactureGeneratedScreen() {
   const router = useRouter();
-  const { id, total } = useLocalSearchParams();
+  const [status, setStatus] = useState<PrintStatus>('success');
 
-  const formattedTotal = total 
-    ? Number(total).toLocaleString('fr-FR') + ' FCFA'
-    : '0 FCFA';
+  const cfg = STATUS_CONFIG[status];
+  const Icon = cfg.icon;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace('/(drawer)/(tabs)')} style={styles.closeButton}>
-          <X size={24} color={Colors.textPrimary} />
+          <X size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>BoutiqueApp</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>Lotus Business</Text>
+        <View style={{ width: 38 }} />
       </View>
 
       <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <View style={styles.iconBg}>
-            <FileText size={50} color={Colors.textPrimary} strokeWidth={1.5} />
-            <View style={styles.checkBadge}>
-              <CheckCircle size={20} color={Colors.success} fill="#fff" />
-            </View>
-          </View>
+        {/* Icône statut */}
+        <View style={{paddingTop: -50, marginBottom: 50}}>
+        <Image source={require("@/assets/images/sucess.png")} style={{width: 150, height: 150, alignSelf: "center"}} />
         </View>
+        {/* <View style={[styles.iconBg, { backgroundColor: cfg.iconBg }]}>
+          <Icon size={48} color={cfg.iconColor} strokeWidth={2} />
+        </View> */}
 
-        <Text style={styles.successTitle}>Facture générée</Text>
-        <Text style={styles.description}>
-          La facture est prête pour l'impression{"\n"}ou le partage.
-        </Text>
+        <Text style={styles.title}>{cfg.title}</Text>
+        <Text style={styles.subtitle}>{cfg.subtitle}</Text>
 
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryBtn}>
-            <Printer size={20} color="#fff" style={styles.btnIcon} />
-            <Text style={styles.primaryBtnText}>Imprimer la facture</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.secondaryBtn}
+        {/* Bouton principal contextuel */}
+        {status === 'success' ? (
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            activeOpacity={0.85}
             onPress={() => router.replace('/(drawer)/(tabs)')}
           >
-            <Text style={styles.secondaryBtnText}>Fermer</Text>
+            <Text style={styles.primaryBtnText}>Terminer</Text>
           </TouchableOpacity>
-        </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            activeOpacity={0.85}
+            onPress={() => setStatus('success')} // ← remplace par ton appel d'impression réel
+          >
+            <Text style={styles.primaryBtnText}>Réessayer</Text>
+          </TouchableOpacity>
+        )}
 
-        <View style={styles.backupStatus}>
-          <Cloud size={16} color={Colors.textSecondary} />
-          <Text style={styles.backupText}>Sauvegardé dans votre dossier Google Drive</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          activeOpacity={0.7}
+          onPress={() => router.replace('/(drawer)/(tabs)')}
+        >
+          <Text style={styles.secondaryBtnText}>
+            {status === 'success' ? "Retour à l\'accueil" : "Ignorer et fermer"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.previewCard}>
-        <View style={styles.previewHeader}>
-          <View>
-            <Text style={styles.previewLabel}>FACTURE NO.</Text>
-            <Text style={styles.previewId}>{id || '---'}</Text>
-          </View>
-          <View style={styles.fileIcon}>
-            <FileText size={20} color="#FFF" />
-          </View>
+      {/* Sélecteur de statut — DEV ONLY, retire en prod */}
+      {/* {__DEV__ && (
+        <View style={styles.devSwitcher}>
+          {(['success', 'disconnected', 'failed'] as PrintStatus[]).map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[styles.devBtn, status === s && styles.devBtnActive]}
+              onPress={() => setStatus(s)}
+            >
+              <Text style={[styles.devBtnText, status === s && styles.devBtnTextActive]}>
+                {s}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        <View style={styles.previewFooter}>
-          <Text style={styles.totalLabel}>Total TTC</Text>
-          <Text style={styles.totalValue}>{formattedTotal}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.footerSpacing} />
+      )} */}
     </SafeAreaView>
   );
 }
 
-
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: 30,
+    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'android' ? 30 : 0,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
   },
-  closeButton: {
-    padding: 8,
-  },
-  title: {
+  closeButton: { padding: 6 },
+  headerTitle: {
     fontFamily: FontFamily.bold,
-    fontSize: 18,
+    fontSize: 16,
     color: Colors.textPrimary,
   },
+
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 30,
-  },
-  iconContainer: {
-    marginBottom: 20,
+    paddingHorizontal: 32,
   },
   iconBg: {
-    width: 120,
-    height: 120,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    marginBottom: 24,
   },
-  checkBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-  },
-  successTitle: {
+  title: {
     fontFamily: FontFamily.bold,
-    fontSize: 24,
+    fontSize: 22,
     color: Colors.textPrimary,
-    marginBottom: 10,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  description: {
+  subtitle: {
     fontFamily: FontFamily.medium,
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 40,
   },
-  actions: {
-    width: '100%',
-    marginBottom: 30,
-  },
   primaryBtn: {
-    backgroundColor: '#000',
+    backgroundColor: '#111',
     width: '100%',
-    height: 56,
-    borderRadius: 16,
-    flexDirection: 'row',
+    height: 54,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  btnIcon: {
-    marginRight: 10,
-  },
   primaryBtnText: {
     fontFamily: FontFamily.bold,
-    fontSize: 16,
+    fontSize: 15,
     color: '#fff',
   },
   secondaryBtn: {
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
+    paddingVertical: 10,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   secondaryBtnText: {
-    fontFamily: FontFamily.bold,
-    fontSize: 16,
-    color: Colors.textPrimary,
-  },
-  backupStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backupText: {
     fontFamily: FontFamily.medium,
-    fontSize: 11,
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginLeft: 8,
   },
-  previewCard: {
-    marginHorizontal: 30,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 40,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  previewHeader: {
+
+  /* DEV switcher */
+  devSwitcher: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  previewLabel: {
-    fontFamily: FontFamily.bold,
-    fontSize: 9,
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
-  },
-  previewId: {
-    fontFamily: FontFamily.bold,
-    fontSize: 15,
-    color: Colors.textPrimary,
-    marginTop: 4,
-  },
-  fileIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#000',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 32,
   },
-  previewFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+  devBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FAFAFA',
   },
-  totalLabel: {
+  devBtnActive: {
+    backgroundColor: '#111',
+    borderColor: '#111',
+  },
+  devBtnText: {
     fontFamily: FontFamily.medium,
     fontSize: 12,
     color: Colors.textSecondary,
   },
-  totalValue: {
-    fontFamily: FontFamily.bold,
-    fontSize: 20,
-    color: Colors.textPrimary,
-  },
-  footerSpacing: {
-    height: 20,
+  devBtnTextActive: {
+    color: '#fff',
   },
 });
-
-import { Platform } from 'react-native';

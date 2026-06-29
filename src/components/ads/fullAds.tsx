@@ -127,7 +127,7 @@ const FullAdCarousel: React.FC<FullAdCarouselProps> = ({
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           renderItem={({ item }) => (
-            <Image source={item} style={styles.fullImage} resizeMode="cover" />
+            <Image source={item} style={styles.fullImage} resizeMode="contain" />
           )}
           keyExtractor={(_, index) => index.toString()}
           scrollEnabled={false}
@@ -135,15 +135,14 @@ const FullAdCarousel: React.FC<FullAdCarouselProps> = ({
 
         <View style={styles.overlay} />
 
-        {/* 🔥 Compteur ou Bouton Close en haut à droite */}
+
         <View style={styles.topRightContainer}>
           {!canClose ? (
-            // Compteur pendant 5s
             <View style={styles.counterBadge}>
               <Text style={styles.counterText}>{countdown}s</Text>
             </View>
           ) : (
-            // Bouton Close après 5s
+            
             <TouchableOpacity
               style={styles.closeButton}
               onPress={handleClose}

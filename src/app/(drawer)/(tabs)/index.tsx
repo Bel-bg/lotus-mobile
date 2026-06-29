@@ -27,6 +27,7 @@ import {
   bannerImagesMix,
 } from "@/components/ads/bannerData";
 import { useUiStore } from "@/contexts/useUiStore";
+import QuickAccess from "@/components/customs/quickAcess";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -119,11 +120,11 @@ export default function HomeScreen() {
           borderRadius={12}
           onBannerPress={handleBannerPress}
         />
+<QuickAccess />
       </ScrollView>
-
-      <View style={{ flex: 1, top: -150 }}>
+      {/* <View style={{ flex: 1, top: -150 }}>
         <HomeFab />
-      </View>
+      </View> */}
       {showAds && (
         <AdsOverlay
           onFinish={handleAdsFinish}
@@ -202,15 +203,15 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     marginHorizontal: 20,
-    marginTop: 100,
+    marginTop: 30,
     padding: 24,
     borderRadius: 20,
     alignItems: "center",
   },
   emptyImage: {
-    width: 150,
-    height: 150,
-    marginBottom: 20,
+    width: 200,
+    height: 200,
+    resizeMode: "cover",
   },
   emptyTitle: {
     fontFamily: FontFamily.display,

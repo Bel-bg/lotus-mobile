@@ -297,7 +297,6 @@ export default function NewSaleScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
               <Text style={styles.confirmBtnText}>Confirmer</Text>
-              <ArrowRight size={20} color={Colors.textInverse} />
             </TouchableOpacity>
           </View>
 
@@ -550,7 +549,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 56,
     flex: 2,
-    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
